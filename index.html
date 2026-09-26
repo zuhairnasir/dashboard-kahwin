@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Perkahwinan: Aisyah & Zuhair ("Road to Halal")</title>
+  <meta name="description" content="Aplikasi pengurusan perbelanjaan dan senarai kehadiran tetamu perkahwinan Aisyah & Zuhair.">
+  <link rel="stylesheet" href="css/style.css?v=2.2">
+  <!-- Chart.js CDN for interactive visual analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="container header-inner">
+      <div class="brand-section">
+        <div class="brand-icon">💍</div>
+        <div>
+          <h1 class="brand-title">Dashboard Perkahwinan Aisyah & Zuhair</h1>
+          <div class="brand-subtitle">
+            <span>Road to Halal</span>
+            <span class="brand-tag">#AisyahyangZuhair</span>
+            <span style="color:var(--text-muted); font-size:0.75rem;">• 2026 - 2027</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="window.dashboardApp.openAddExpenseModal()">
+          <span>➕</span> Tambah Belanja
+        </button>
+        <button class="btn btn-gold" onclick="window.dashboardApp.openAddGuestModal()">
+          <span>✉️</span> Tambah Tetamu
+        </button>
+
+        <div style="position:relative; display:inline-block;">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('export-menu').classList.toggle('active')">
+            <span>💾</span> Simpan / Eksport ▼
+          </button>
+          <div id="export-menu" style="display:none; position:absolute; right:0; top:110%; background:white; border:1px solid var(--border-color); border-radius:8px; box-shadow:var(--shadow-md); z-index:100; min-width:180px; padding:6px;">
+            <button class="btn btn-outline btn-sm" style="width:100%; justify-content:flex-start; margin-bottom:4px; border:none;" onclick="window.dashboardApp.exportDataJSON(); document.getElementById('export-menu').classList.remove('active');">
+              📁 Muat Turun JSON (Backup)
+            </button>
+            <button class="btn btn-outline btn-sm" style="width:100%; justify-content:flex-start; margin-bottom:4px; border:none;" onclick="window.dashboardApp.exportDataCSV(); document.getElementById('export-menu').classList.remove('active');">
+              📊 Muat Turun CSV (Excel)
+            </button>
+            <button class="btn btn-outline btn-sm" style="width:100%; justify-content:flex-start; border:none;" onclick="window.print(); document.getElementById('export-menu').classList.remove('active');">
+              🖨️ Cetak Ringkasan / PDF
+            </button>
+          </div>
+        </div>
+
+        <button class="btn btn-outline btn-sm" title="Muat naik fail sandaran JSON" onclick="document.getElementById('import-file-input').click()">
+          <span>📂</span> Import
+        </button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none;">
+
+        <button class="btn btn-outline btn-sm" style="color:#ef4444;" title="Pulihkan kepada data awal Excel" onclick="window.dashboardApp.resetToDefault()">
+          <span>🔄</span> Reset
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="margin-top: 20px;">
+
+    <!-- Tab Navigation (Clean Top Navigation) -->
+    <nav class="nav-tabs-wrapper">
+      <div class="nav-tabs-group">
+        <button class="nav-tab-btn active" data-tab="all">
+          <span class="tab-icon">📊</span> Semua Belanja
+        </button>
+        <button class="nav-tab-btn" data-tab="tunang">
+          <span class="tab-icon">🌸</span> Pertunangan
+        </button>
+        <button class="nav-tab-btn" data-tab="nikah">
+          <span class="tab-icon">💍</span> Akad Nikah
+        </button>
+        <button class="nav-tab-btn" data-tab="sanding">
+          <span class="tab-icon">👑</span> Sanding (P)
+        </button>
+        <button class="nav-tab-btn" data-tab="bertandang">
+          <span class="tab-icon">🏛️</span> Bertandang (L)
+        </button>
+      </div>
+
+      <div class="nav-tabs-divider"></div>
+
+      <div class="nav-tabs-group">
+        <button class="nav-tab-btn" data-tab="guests">
+          <span class="tab-icon">💌</span> Tetamu
+          <span class="tab-badge" id="tab-guest-badge">0</span>
+        </button>
+        <button class="nav-tab-btn" data-tab="receipts">
+          <span class="tab-icon">📁</span> Peti Resit
+          <span class="tab-badge" id="tab-receipts-badge">0</span>
+        </button>
+        <button class="nav-tab-btn" data-tab="charts">
+          <span class="tab-icon">📈</span> Analisis
+        </button>
+      </div>
+    </nav>
+
+    <!-- TAB 1: Semua Perbelanjaan (Master Dashboard) -->
+    <div class="tab-pane active" id="tab-pane-all">
+      <!-- Master KPI Cards Grid -->
+      <section class="master-kpi-grid">
+        <div class="kpi-card kpi-budget">
+          <div class="kpi-header">
+            <span class="kpi-title">Jumlah Anggaran Bajet</span>
+            <div class="kpi-icon-wrap" style="background:#fef3c7; color:#b45309;">💰</div>
+          </div>
+          <div class="kpi-value" id="kpi-total-budget">RM 0.00</div>
+          <div class="kpi-subtext">
+            <span>Semua Fasa Majlis</span>
+            <span style="color:var(--gold-hover); font-weight:700;">Target</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-spent">
+          <div class="kpi-header">
+            <span class="kpi-title">Jumlah Sebenar / Belanja</span>
+            <div class="kpi-icon-wrap" style="background:#fce7f3; color:#be185d;">🧾</div>
+          </div>
+          <div class="kpi-value" id="kpi-total-actual">RM 0.00</div>
+          <div class="kpi-subtext">
+            <span>Komitmen Semasa</span>
+            <span id="tab-all-exp-badge" class="badge badge-pending">0 item</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-paid">
+          <div class="kpi-header">
+            <span class="kpi-title">Sudah Dibayar</span>
+            <div class="kpi-icon-wrap" style="background:#ecfdf5; color:#047857;">✅</div>
+          </div>
+          <div class="kpi-value" id="kpi-total-paid" style="color:var(--emerald-dark);">RM 0.00</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="kpi-paid-progress" style="width: 0%;"></div>
+          </div>
+          <div class="kpi-subtext">
+            <span id="kpi-paid-percentage">0% Selesai</span>
+            <span style="color:var(--emerald-dark); font-weight:600;">Status Terkini</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-balance">
+          <div class="kpi-header">
+            <span class="kpi-title">Baki Belum Dibayar</span>
+            <div class="kpi-icon-wrap" style="background:#eff6ff; color:#1d4ed8;">⏳</div>
+          </div>
+          <div class="kpi-value" id="kpi-total-balance" style="color:#1d4ed8;">RM 0.00</div>
+          <div class="kpi-subtext">
+            <span>Perlu Diselesaikan</span>
+            <span style="color:#1d4ed8; font-weight:700;">Belum Bayar</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-guests">
+          <div class="kpi-header">
+            <span class="kpi-title">Jumlah Jemputan Tetamu</span>
+            <div class="kpi-icon-wrap" style="background:#f5f3ff; color:#7c3aed;">👥</div>
+          </div>
+          <div class="kpi-value" id="kpi-total-guests">0</div>
+          <div class="kpi-subtext">
+            <span>Majlis Lelaki & Perempuan</span>
+            <span style="color:#7c3aed; font-weight:700;">RSVP Aktif</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Milestone Journey & Financial Progress Tracker -->
+      <section class="milestone-tracker-card" id="milestone-tracker-card">
+        <div class="milestone-header">
+          <div class="milestone-title-wrap">
+            <h3><span>✨</span> Perjalanan Road to Halal: Aisyah & Zuhair</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">
+              Pantau kemajuan persiapan perkahwinan dan rekod pembayaran secara visual
+            </p>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span class="milestone-overall-badge" id="milestone-paid-badge">
+              💳 0% Sudah Bayar
+            </span>
+            <span class="milestone-overall-badge" id="milestone-items-badge" style="background:#ecfdf5; color:#047857;">
+              ✅ 0/195 Item Selesai
+            </span>
+          </div>
+        </div>
+
+        <div class="progress-container-detailed" style="margin-bottom: 16px;">
+          <div class="progress-labels-row">
+            <span style="color:var(--text-dark);">Kemajuan Bayaran Keseluruhan</span>
+            <span id="progress-bar-text" style="color:var(--emerald-dark);">0% (RM 0 / RM 0)</span>
+          </div>
+          <div class="glowing-progress-bar">
+            <div class="glowing-progress-fill" id="glowing-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="milestone-steps-grid" id="milestone-steps-grid">
+          <!-- Generated by JavaScript -->
+        </div>
+      </section>
+
+      <div id="all-content-area"></div>
+    </div>
+
+    <!-- TAB 2: Pertunangan -->
+    <div class="tab-pane" id="tab-pane-tunang">
+      <div class="phase-banner">
+        <div class="phase-banner-info">
+          <h2 id="tunang-banner-title">Pertunangan</h2>
+          <div class="phase-banner-tags">
+            <span class="tag-pill" id="tunang-banner-date">📅 5 September 2026</span>
+            <span class="tag-pill" id="tunang-banner-theme">🎨 Tema: Soft Pink</span>
+            <span class="tag-pill" id="tunang-banner-venue">📍 Kediaman Pengantin Perempuan</span>
+            <span class="tag-pill" style="background:var(--primary-light); color:var(--primary); font-weight:700;">#AisyahyangZuhair</span>
+          </div>
+        </div>
+        <div class="phase-stats-strip">
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Anggaran</div>
+            <div class="phase-stat-val" id="tunang-stat-budget">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sebenar</div>
+            <div class="phase-stat-val" id="tunang-stat-actual" style="color:var(--primary);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sudah Bayar</div>
+            <div class="phase-stat-val" id="tunang-stat-paid" style="color:var(--emerald-dark);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Baki Belum Bayar</div>
+            <div class="phase-stat-val" id="tunang-stat-balance" style="color:#2563eb;">RM 0.00</div>
+          </div>
+        </div>
+      </div>
+      <div id="tunang-content-area"></div>
+    </div>
+
+    <!-- TAB 3: Akad Nikah -->
+    <div class="tab-pane" id="tab-pane-nikah">
+      <div class="phase-banner">
+        <div class="phase-banner-info">
+          <h2 id="nikah-banner-title">Akad Nikah</h2>
+          <div class="phase-banner-tags">
+            <span class="tag-pill" id="nikah-banner-date">📅 27 Mac 2027</span>
+            <span class="tag-pill" id="nikah-banner-theme">🎨 Tema: Cream Gold</span>
+            <span class="tag-pill" id="nikah-banner-venue">📍 Masjid / Dewan Nikah</span>
+            <span class="tag-pill" style="background:#fef3c7; color:#b45309; font-weight:700;">Mas Kahwin: 1 Dinar</span>
+          </div>
+        </div>
+        <div class="phase-stats-strip">
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Anggaran</div>
+            <div class="phase-stat-val" id="nikah-stat-budget">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sebenar</div>
+            <div class="phase-stat-val" id="nikah-stat-actual" style="color:var(--primary);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sudah Bayar</div>
+            <div class="phase-stat-val" id="nikah-stat-paid" style="color:var(--emerald-dark);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Baki Belum Bayar</div>
+            <div class="phase-stat-val" id="nikah-stat-balance" style="color:#2563eb;">RM 0.00</div>
+          </div>
+        </div>
+      </div>
+      <div id="nikah-content-area"></div>
+    </div>
+
+    <!-- TAB 4: Sanding Perempuan -->
+    <div class="tab-pane" id="tab-pane-sanding">
+      <div class="phase-banner">
+        <div class="phase-banner-info">
+          <h2 id="sanding-banner-title">Sanding (Belah Perempuan)</h2>
+          <div class="phase-banner-tags">
+            <span class="tag-pill" id="sanding-banner-date">📅 30 Mei 2027</span>
+            <span class="tag-pill" id="sanding-banner-theme">🎨 Tema: Cream + Gold</span>
+            <span class="tag-pill" id="sanding-banner-venue">📍 Kediaman Pengantin Perempuan</span>
+            <span class="tag-pill" style="background:#fce7f3; color:#be185d; font-weight:700;">Resepsi Pihak Perempuan</span>
+          </div>
+        </div>
+        <div class="phase-stats-strip">
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Anggaran</div>
+            <div class="phase-stat-val" id="sanding-stat-budget">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sebenar</div>
+            <div class="phase-stat-val" id="sanding-stat-actual" style="color:var(--primary);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sudah Bayar</div>
+            <div class="phase-stat-val" id="sanding-stat-paid" style="color:var(--emerald-dark);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Baki Belum Bayar</div>
+            <div class="phase-stat-val" id="sanding-stat-balance" style="color:#2563eb;">RM 0.00</div>
+          </div>
+        </div>
+      </div>
+      <div id="sanding-content-area"></div>
+    </div>
+
+    <!-- TAB 5: Bertandang Lelaki -->
+    <div class="tab-pane" id="tab-pane-bertandang">
+      <div class="phase-banner">
+        <div class="phase-banner-info">
+          <h2 id="bertandang-banner-title">Bertandang (Belah Lelaki)</h2>
+          <div class="phase-banner-tags">
+            <span class="tag-pill" id="bertandang-banner-date">📅 30 Mei 2027</span>
+            <span class="tag-pill" id="bertandang-banner-theme">🎨 Tema: Baby Blue</span>
+            <span class="tag-pill" id="bertandang-banner-venue">📍 Dewan Majlis (800 pax)</span>
+            <span class="tag-pill" style="background:#e0f2fe; color:#0369a1; font-weight:700;">Resepsi Pihak Lelaki</span>
+          </div>
+        </div>
+        <div class="phase-stats-strip">
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Anggaran</div>
+            <div class="phase-stat-val" id="bertandang-stat-budget">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sebenar</div>
+            <div class="phase-stat-val" id="bertandang-stat-actual" style="color:var(--primary);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Sudah Bayar</div>
+            <div class="phase-stat-val" id="bertandang-stat-paid" style="color:var(--emerald-dark);">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">Baki Belum Bayar</div>
+            <div class="phase-stat-val" id="bertandang-stat-balance" style="color:#2563eb;">RM 0.00</div>
+          </div>
+        </div>
+      </div>
+      <div id="bertandang-content-area"></div>
+    </div>
+
+    <!-- TAB 6: Senarai Jemputan & Kehadiran (RSVP) -->
+    <div class="tab-pane" id="tab-pane-guests">
+      <!-- Guest KPI Summary -->
+      <div class="guest-kpi-summary">
+        <div class="guest-stat-box">
+          <div class="guest-stat-num" id="gst-kpi-total">0</div>
+          <div class="guest-stat-lbl">Jumlah Kad Jemputan</div>
+        </div>
+        <div class="guest-stat-box">
+          <div class="guest-stat-num" id="gst-kpi-pax" style="color:var(--primary);">0 Pax</div>
+          <div class="guest-stat-lbl">Anggaran Jumlah Tetamu</div>
+        </div>
+        <div class="guest-stat-box">
+          <div class="guest-stat-num" id="gst-kpi-confirmed" style="color:var(--emerald-dark);">0 Pax</div>
+          <div class="guest-stat-lbl">Sah Hadir (Akan Hadir)</div>
+        </div>
+        <div class="guest-stat-box">
+          <div class="guest-stat-num" id="gst-kpi-declined" style="color:var(--rose);">0 Pax</div>
+          <div class="guest-stat-lbl">Tidak Dapat Hadir</div>
+        </div>
+        <div class="guest-stat-box">
+          <div class="guest-stat-num" id="gst-kpi-pending" style="color:var(--amber);">0 Pax</div>
+          <div class="guest-stat-lbl">Belum Pasti / Menunggu</div>
+        </div>
+      </div>
+
+      <div class="control-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="guest-search-input" placeholder="Cari nama tetamu, keluarga, atau organisasi...">
+        </div>
+
+        <div class="filter-group">
+          <select class="select-filter" id="guest-side-filter">
+            <option value="all">Semua Pihak Majlis</option>
+            <option value="Lelaki">Majlis Lelaki (273)</option>
+            <option value="Perempuan">Majlis Perempuan (87)</option>
+          </select>
+
+          <select class="select-filter" id="guest-kad-filter">
+            <option value="all">Semua Kad Jemputan</option>
+            <option value="Sudah Hantar">✉️ Sudah Hantar</option>
+            <option value="Belum Hantar">⏳ Belum Hantar</option>
+          </select>
+
+          <select class="select-filter" id="guest-att-filter">
+            <option value="all">Semua Status Kehadiran</option>
+            <option value="Belum Pasti">❓ Belum Pasti</option>
+            <option value="Akan Hadir">✅ Sah Hadir</option>
+            <option value="Tidak Hadir">❌ Tidak Hadir</option>
+            <option value="Hadir">🎉 Hadir Hari Majlis</option>
+          </select>
+
+          <button class="btn btn-gold btn-sm" onclick="window.dashboardApp.openAddGuestModal()">
+            ➕ Tambah Tetamu
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 4px;">
+        <span id="guest-filtered-count" style="font-size:0.82rem; color:var(--text-muted); font-weight:600;">
+          Menunjukkan senarai tetamu...
+        </span>
+        <span style="font-size:0.78rem; color:var(--text-muted);">
+          Tip: Klik pada status untuk menukar status kad / kehadiran dengan pantas.
+        </span>
+      </div>
+
+      <div class="table-container">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">Bil</th>
+                <th>Nama Tetamu / Keluarga</th>
+                <th>Bilangan Pax</th>
+                <th>Majlis</th>
+                <th>Kumpulan / Kontak</th>
+                <th>Kad Jemputan</th>
+                <th>Status Kehadiran</th>
+                <th style="text-align:center; width: 90px;">Tindakan</th>
+              </tr>
+            </thead>
+            <tbody id="guests-tbody">
+              <!-- Loaded via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: Peti Resit & Dokumen -->
+    <div class="tab-pane" id="tab-pane-receipts">
+      <div class="control-bar">
+        <div>
+          <h3 style="font-family:var(--font-serif); font-size:1.25rem; color:var(--primary); display:flex; align-items:center; gap:8px;">
+            <span>📁</span> Peti Simpanan Resit & Dokumen Bayaran
+          </h3>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+            Muat naik dan simpan bukti bayaran, resit deposit, invois katering/dewan, dan dokumen nikah dengan selamat
+          </p>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="window.dashboardApp.promptUploadGeneralReceipt()">
+            📷 Muat Naik Resit / Dokumen
+          </button>
+        </div>
+      </div>
+
+      <div id="receipts-gallery-container">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+
+    <!-- TAB 8: Analisis & Graf -->
+    <div class="tab-pane" id="tab-pane-charts">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">📊 Perbelanjaan Mengikut Fasa (Anggaran vs Sebenar)</h3>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-phase-expenses"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">⚖️ Perbelanjaan Mengikut Pihak (Lelaki / Perempuan / Kongsi)</h3>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-pihak-expenses"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">💌 Status Kehadiran Tetamu (RSVP)</h3>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-guest-rsvp"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">💳 Status Bayaran Keseluruhan (Sudah Bayar vs Belum Bayar)</h3>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-payment-status"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal: Tambah & Kemaskini Perbelanjaan -->
+  <div class="modal-overlay" id="expense-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="expense-modal-title">Tambah Perbelanjaan Baharu</h3>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <form id="expense-form" onsubmit="event.preventDefault(); window.dashboardApp.handleSaveExpense(event);">
+        <div class="modal-body">
+          <div id="modal-group-preset-banner" style="display:none; align-items:center; gap:8px; background:#fdf2f8; border:1px solid #fbcfe8; border-radius:var(--radius-md); padding:8px 12px; margin-bottom:14px; font-size:0.84rem; color:#9d174d;">
+            <span>📌 Seksyen / Bahagian Terpilih:</span>
+            <strong id="modal-group-preset-name">🎁 Barang Hantaran (Perempuan Sediakan)</strong>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="modal-exp-phase">Fasa Majlis *</label>
+              <select class="form-control" id="modal-exp-phase" required onchange="window.dashboardApp.handleModalPhaseChange(this.value)">
+                <option value="tunang">🌸 Pertunangan (5 Sept 2026)</option>
+                <option value="nikah">💍 Akad Nikah (27 Mac 2027)</option>
+                <option value="sanding">👑 Sanding Belah Perempuan (30 Mei 2027)</option>
+                <option value="bertandang">🏛️ Bertandang Belah Lelaki (30 Mei 2027)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-exp-pihak">Pihak Penanggung *</label>
+              <select class="form-control" id="modal-exp-pihak" required>
+                <option value="Kongsi">Kongsi Bersama</option>
+                <option value="Lelaki">Pihak Lelaki</option>
+                <option value="Perempuan">Pihak Perempuan</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="modal-exp-grouptitle">Bahagian / Seksyen *</label>
+            <select class="form-control" id="modal-exp-grouptitle" required onchange="window.dashboardApp.handleModalGroupChange(this.value)">
+              <option value="👰 Part Pengantin Perempuan">👰 Part Pengantin Perempuan</option>
+              <option value="🤵 Part Pengantin Lelaki">🤵 Part Pengantin Lelaki</option>
+              <option value="🎁 Barang Hantaran (Perempuan Sediakan)">🎁 Barang Hantaran (Perempuan Sediakan)</option>
+              <option value="🎁 Barang Hantaran (Lelaki Sediakan)">🎁 Barang Hantaran (Lelaki Sediakan)</option>
+              <option value="📜 Dokumen & Prosedur Nikah">📜 Dokumen & Prosedur Nikah</option>
+              <option value="📜 Upacara Akad & Mas Kahwin">📜 Upacara Akad & Mas Kahwin</option>
+              <option value="🍽️ Jamuan & Katering">🍽️ Jamuan & Katering</option>
+              <option value="🏰 Lokasi, Dewan & Khemah">🏰 Lokasi, Dewan & Khemah</option>
+              <option value="💌 Jemputan & Doorgift">💌 Jemputan & Doorgift</option>
+              <option value="🚙 Penginapan & Logistik">🚙 Penginapan & Logistik</option>
+              <option value="📸 Fotografi & Media">📸 Fotografi & Media</option>
+              <option value="🎵 Hiburan & PA System">🎵 Hiburan & PA System</option>
+              <option value="✨ Lain-lain Persiapan">✨ Lain-lain Persiapan</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="modal-exp-desc">Perkara / Item Perbelanjaan *</label>
+            <input type="text" class="form-control" id="modal-exp-desc" placeholder="Contoh: Katering 500 pax, Baju Nikah..." required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="modal-exp-category">Kategori / Label Tambahan</label>
+            <input type="text" class="form-control" id="modal-exp-category" placeholder="Contoh: Katering, Busana, Pelamin, Hantaran, Fotografi...">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="modal-exp-budget">Anggaran Bajet (RM)</label>
+              <input type="number" step="0.01" class="form-control" id="modal-exp-budget" placeholder="0.00">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-exp-actual">Harga Sebenar (RM)</label>
+              <input type="number" step="0.01" class="form-control" id="modal-exp-actual" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="modal-exp-status">Status Bayaran</label>
+              <select class="form-control" id="modal-exp-status">
+                <option value="Belum">❌ Belum Bayar</option>
+                <option value="Deposit">⏳ Deposit / Bayaran Awal</option>
+                <option value="Selesai">✅ Selesai Bayar</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-exp-notes">Catatan Tambahan</label>
+              <input type="text" class="form-control" id="modal-exp-notes" placeholder="Contoh: Deposit RM200, baki bayar hari kejadian...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Bukti Pembayaran / Resit / Invois (Pilihan)</label>
+            <input type="file" id="modal-exp-file" accept="image/*,application/pdf" class="form-control" style="padding:6px 10px;">
+            <div id="modal-exp-receipt-status" style="display:none; font-size:0.78rem; color:#047857; margin-top:4px;">
+              ✅ Sudah ada resit tersimpan untuk item ini.
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Perbelanjaan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Tambah & Kemaskini Tetamu -->
+  <div class="modal-overlay" id="guest-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="guest-modal-title">Tambah Jemputan Tetamu Baharu</h3>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <form id="guest-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="modal-gst-nama">Nama Tetamu / Keluarga *</label>
+            <input type="text" class="form-control" id="modal-gst-nama" placeholder="Contoh: Pak Su & Sekeluarga, Ahmad Faris..." required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="modal-gst-pax">Anggaran Pax (Orang) *</label>
+              <input type="number" min="1" max="500" class="form-control" id="modal-gst-pax" value="1" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-gst-side">Majlis Pihak *</label>
+              <select class="form-control" id="modal-gst-side" required>
+                <option value="Lelaki">Majlis Lelaki (Bertandang / Nikah)</option>
+                <option value="Perempuan">Majlis Perempuan (Sanding / Nikah)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="modal-gst-group">Kumpulan / Organisasi / Hubungan</label>
+            <input type="text" class="form-control" id="modal-gst-group" placeholder="Contoh: JANA, SKSL, SKKB, SAMBEST, Saudara Mara, Rakan Kerja...">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="modal-gst-kad">Status Kad Jemputan</label>
+              <select class="form-control" id="modal-gst-kad">
+                <option value="Belum Hantar">⏳ Belum Hantar</option>
+                <option value="Sudah Hantar">✉️ Sudah Hantar</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="modal-gst-attendance">Status Kehadiran (RSVP)</label>
+              <select class="form-control" id="modal-gst-attendance">
+                <option value="Belum Pasti">❓ Belum Pasti</option>
+                <option value="Akan Hadir">✅ Sah Hadir</option>
+                <option value="Tidak Hadir">❌ Tidak Hadir</option>
+                <option value="Hadir">🎉 Hadir Hari Majlis</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="modal-gst-notes">Catatan / Meja Khas</label>
+            <input type="text" class="form-control" id="modal-gst-notes" placeholder="Contoh: Meja VIP, perlukan kerusi baby...">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel">Batal</button>
+          <button type="submit" class="btn btn-gold">Simpan Tetamu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Muat Naik Resit / Dokumen Baharu -->
+  <div class="modal-overlay" id="upload-receipt-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Muat Naik Resit / Dokumen Bayaran</h3>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <form id="upload-receipt-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="receipt-target-select">Pautkan ke Perbelanjaan *</label>
+            <select class="form-control" id="receipt-target-select" required>
+              <option value="__general__">📄 Dokumen Umum / Surat / Borang Nikah</option>
+              <!-- Populated dynamically with expenses -->
+            </select>
+            <small style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;">
+              Pilih item perbelanjaan yang sepadan dengan resit ini, atau pilih "Dokumen Umum" jika tiada item khusus.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="upload-receipt-file-input">Pilih Fail Resit / Invois / Dokumen *</label>
+            <input type="file" class="form-control" id="upload-receipt-file-input" accept="image/*,application/pdf" required>
+            <small style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;">
+              Sokongan format: Imej (JPG, PNG, WebP) atau Dokumen PDF.
+            </small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="receipt-amount-input">Jumlah Bayaran (RM)</label>
+              <input type="number" step="0.01" class="form-control" id="receipt-amount-input" placeholder="0.00">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="receipt-date-input">Tarikh Bayaran</label>
+              <input type="date" class="form-control" id="receipt-date-input">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="receipt-notes-input">Penerangan / Catatan Resit</label>
+            <input type="text" class="form-control" id="receipt-notes-input" placeholder="Contoh: Resit bayaran deposit 50% katering...">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan ke Peti Resit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Pratonton Resit & Dokumen -->
+  <div class="modal-overlay" id="receipt-modal">
+    <div class="modal-content" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="receipt-modal-title">Pratonton Resit & Dokumen</h3>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div id="receipt-modal-img-wrap" style="margin-bottom: 14px; min-height: 180px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:8px; overflow:hidden;">
+          <!-- Image preview injected by JS -->
+        </div>
+        <div id="receipt-modal-meta" style="font-size:0.84rem; color:var(--text-muted); line-height:1.6; text-align:left; background:#faf8f6; padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
+          <!-- Meta details injected by JS -->
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between;">
+        <button type="button" class="btn btn-outline" style="color:#ef4444;" id="btn-delete-receipt">
+          🗑️ Padam Resit
+        </button>
+        <div style="display:flex; gap:8px;">
+          <a id="btn-download-receipt" class="btn btn-outline" download="resit.jpg" target="_blank">
+            ⬇️ Buka Penuh / Muat Turun
+          </a>
+          <button type="button" class="btn btn-primary modal-cancel">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="receipt-upload-input" accept="image/*,application/pdf" style="display:none;">
+
+  <!-- Toast Notifications Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Core Scripts -->
+  <script src="data/weddingData.js?v=2.2"></script>
+  <script src="js/app.js?v=2.2"></script>
+</body>
+</html>
