@@ -1967,3 +1967,359 @@ tr.row-party-kongsi td:first-child {
   z-index: 5;
   position: relative;
 }
+
+/* ==========================================================================
+   Paparan Khas Baki Belum Bayar Mengikut Pihak (Lelaki vs Perempuan)
+   ========================================================================== */
+.unpaid-overview-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.unpaid-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border-color);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.unpaid-header-title,
+.unpaid-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.unpaid-header-icon,
+.unpaid-icon {
+  font-size: 1.5rem;
+  background: #fdf2f8;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  flex-shrink: 0;
+}
+
+.unpaid-title-text {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: var(--primary);
+  margin: 0;
+  font-weight: 700;
+}
+
+.unpaid-title-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 3px 0 0 0;
+}
+
+.unpaid-total-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.84rem;
+  color: #92400e;
+}
+
+.unpaid-total-lbl {
+  font-weight: 600;
+}
+
+.unpaid-total-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #b45309;
+}
+
+.unpaid-total-count {
+  font-size: 0.76rem;
+  color: #b45309;
+  font-weight: 600;
+}
+
+.unpaid-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.unpaid-party-box {
+  background: #faf8f6;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.unpaid-party-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.unpaid-party-box.box-lelaki {
+  border-left: 4px solid #3b82f6;
+}
+.unpaid-party-box.box-lelaki:hover,
+.unpaid-party-box.box-lelaki.active-filter {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.unpaid-party-box.box-perempuan {
+  border-left: 4px solid #ec4899;
+}
+.unpaid-party-box.box-perempuan:hover,
+.unpaid-party-box.box-perempuan.active-filter {
+  background: #fdf2f8;
+  border-color: #ec4899;
+}
+
+.unpaid-party-box.box-kongsi {
+  border-left: 4px solid #8b5cf6;
+}
+.unpaid-party-box.box-kongsi:hover,
+.unpaid-party-box.box-kongsi.active-filter {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+}
+
+.box-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.box-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.box-avatar {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.box-role {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  display: block;
+}
+
+.box-item-count {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: block;
+}
+
+.box-action-chip {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: white;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.box-action-chip.selected {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.box-main-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+
+.text-lelaki { color: #1d4ed8; }
+.text-perempuan { color: #be185d; }
+.text-kongsi { color: #6d28d9; }
+
+.box-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.box-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.fill-lelaki { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.fill-perempuan { background: linear-gradient(90deg, #f472b6, #db2777); }
+.fill-kongsi { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+
+.box-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Tag Status Belum Bayar di Header Seksyen */
+.group-unpaid-breakdown-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.unpaid-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.unpaid-tag.tag-perempuan {
+  background: #fdf2f8;
+  color: #be185d;
+  border: 1px solid #fbcfe8;
+}
+
+.unpaid-tag.tag-lelaki {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.unpaid-tag.tag-kongsi {
+  background: #f5f3ff;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
+}
+
+.unpaid-tag.tag-all-paid {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  font-weight: 700;
+}
+
+/* Group Card Footer Stats Summary */
+.group-footer-stat-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-dark);
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #faf8f6;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+}
+
+.footer-stat-lead {
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.footer-stat-chip {
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  background: white;
+  border: 1px solid var(--border-color);
+}
+
+.footer-stat-chip.paid {
+  color: var(--emerald-dark);
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.footer-stat-chip.unpaid {
+  color: #b45309;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.footer-stat-chip.perempuan {
+  color: #be185d;
+  border-color: #fbcfe8;
+  background: #fdf2f8;
+}
+
+.footer-stat-chip.lelaki {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.footer-stat-chip.kongsi {
+  color: #7c3aed;
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+/* Updated Segmented Bar Amount Group */
+.seg-amount-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.seg-amount-unpaid {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #b45309;
+  line-height: 1.1;
+}
+
+.seg-amount-total {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .unpaid-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .unpaid-overview-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

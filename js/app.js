@@ -576,6 +576,33 @@
     }, allowUndo ? 4500 : 3200);
   }
 
+  // --- Helper to calculate item amounts consistently ---
+  function getItemAmounts(item) {
+    const budget = Number(item.budget) || 0;
+    const actual = Number(item.actual) || 0;
+    const val = actual > 0 ? actual : budget;
+    const isPaid = item.status === 'Selesai';
+    let paid = 0;
+    let unpaid = 0;
+
+    if (isPaid) {
+      paid = val;
+      unpaid = 0;
+    } else if (item.status === 'Deposit' && item.notes && item.notes.toLowerCase().includes('deposit')) {
+      const match = item.notes.match(/deposit\s*(\d+)/i);
+      if (match) {
+        paid = Number(match[1]);
+        unpaid = Math.max(0, val - paid);
+      } else {
+        unpaid = val;
+      }
+    } else {
+      unpaid = val;
+    }
+
+    return { budget, actual, val, paid, unpaid, isPaid };
+  }
+
   // --- Master KPI Calculations ---
   function calculateMasterStats() {
     let totalBudget = 0;
@@ -583,20 +610,33 @@
     let totalPaid = 0;
     let completedItems = 0;
 
+    let unpaidLelaki = 0;
+    let unpaidPerempuan = 0;
+    let unpaidKongsi = 0;
+    let paidLelaki = 0;
+    let paidPerempuan = 0;
+    let paidKongsi = 0;
+
     appData.expenses.forEach(item => {
-      const budget = Number(item.budget) || 0;
-      const actual = Number(item.actual) || 0;
+      const { budget, actual, val, paid, unpaid, isPaid } = getItemAmounts(item);
       totalBudget += budget;
       totalActual += actual;
+      totalPaid += paid;
 
-      if (item.status === 'Selesai') {
+      const side = item.pihak || 'Kongsi';
+      if (isPaid) {
         completedItems += 1;
-        totalPaid += (actual > 0 ? actual : budget);
-      } else if (item.status === 'Deposit' && item.notes && item.notes.toLowerCase().includes('deposit')) {
-        const match = item.notes.match(/deposit\s*(\d+)/i);
-        if (match) {
-          totalPaid += Number(match[1]);
-        }
+      }
+
+      if (side === 'Lelaki') {
+        paidLelaki += paid;
+        unpaidLelaki += unpaid;
+      } else if (side === 'Perempuan') {
+        paidPerempuan += paid;
+        unpaidPerempuan += unpaid;
+      } else {
+        paidKongsi += paid;
+        unpaidKongsi += unpaid;
       }
     });
 
@@ -632,6 +672,12 @@
       itemsPercentage,
       totalItems: appData.expenses.length,
       completedItems,
+      unpaidLelaki,
+      unpaidPerempuan,
+      unpaidKongsi,
+      paidLelaki,
+      paidPerempuan,
+      paidKongsi,
       totalGuests,
       totalPax,
       confirmedPax,
@@ -647,6 +693,8 @@
     const elActual = document.getElementById('kpi-total-actual');
     const elPaid = document.getElementById('kpi-total-paid');
     const elBalance = document.getElementById('kpi-total-balance');
+    const elUnpaidLelaki = document.getElementById('kpi-unpaid-lelaki');
+    const elUnpaidPerempuan = document.getElementById('kpi-unpaid-perempuan');
     const elGuests = document.getElementById('kpi-total-guests');
     const elPaidProgress = document.getElementById('kpi-paid-progress');
     const elPaidPercentText = document.getElementById('kpi-paid-percentage');
@@ -655,6 +703,8 @@
     if (elActual) elActual.textContent = formatRM(stats.totalActual);
     if (elPaid) elPaid.textContent = formatRM(stats.totalPaid);
     if (elBalance) elBalance.textContent = formatRM(stats.balanceToPay);
+    if (elUnpaidLelaki) elUnpaidLelaki.textContent = formatRM(stats.unpaidLelaki);
+    if (elUnpaidPerempuan) elUnpaidPerempuan.textContent = formatRM(stats.unpaidPerempuan);
     if (elGuests) elGuests.innerHTML = `${stats.totalGuests} <span style="font-size:0.9rem; font-weight:500; color:var(--text-muted);">(~${stats.totalPax} Pax)</span>`;
 
     if (elPaidProgress) elPaidProgress.style.width = `${stats.paidPercentage}%`;
@@ -746,20 +796,36 @@
     const phases = ['tunang', 'nikah', 'bertandang'];
     phases.forEach(pId => {
       const items = appData.expenses.filter(e => e.phase === pId);
-      const budget = items.reduce((acc, c) => acc + (Number(c.budget) || 0), 0);
-      const actual = items.reduce((acc, c) => acc + (Number(c.actual) || 0), 0);
-      const paid = items.reduce((acc, c) => c.status === 'Selesai' ? acc + (Number(c.actual) || Number(c.budget) || 0) : acc, 0);
+      let budget = 0;
+      let actual = 0;
+      let paid = 0;
+      let unpaidLelaki = 0;
+      let unpaidPerempuan = 0;
+
+      items.forEach(item => {
+        const { budget: b, actual: a, paid: p, unpaid: u } = getItemAmounts(item);
+        budget += b;
+        actual += (a > 0 ? a : b);
+        paid += p;
+        if (item.pihak === 'Lelaki') unpaidLelaki += u;
+        else if (item.pihak === 'Perempuan') unpaidPerempuan += u;
+      });
+
       const balance = Math.max(0, actual - paid);
 
       const elBudget = document.getElementById(`${pId}-stat-budget`);
       const elActual = document.getElementById(`${pId}-stat-actual`);
       const elPaid = document.getElementById(`${pId}-stat-paid`);
       const elBalance = document.getElementById(`${pId}-stat-balance`);
+      const elUnpaidLelaki = document.getElementById(`${pId}-stat-unpaid-lelaki`);
+      const elUnpaidPerempuan = document.getElementById(`${pId}-stat-unpaid-perempuan`);
 
       if (elBudget) elBudget.textContent = formatRM(budget);
       if (elActual) elActual.textContent = formatRM(actual);
       if (elPaid) elPaid.textContent = formatRM(paid);
       if (elBalance) elBalance.textContent = formatRM(balance);
+      if (elUnpaidLelaki) elUnpaidLelaki.textContent = formatRM(unpaidLelaki);
+      if (elUnpaidPerempuan) elUnpaidPerempuan.textContent = formatRM(unpaidPerempuan);
     });
   }
 
@@ -843,22 +909,42 @@
 
     // Calculate 3-Pillar stats (Lelaki, Perempuan, Kongsi) for current phase
     const pStats = {
-      Lelaki: { total: 0, paid: 0, count: 0 },
-      Perempuan: { total: 0, paid: 0, count: 0 },
-      Kongsi: { total: 0, paid: 0, count: 0 }
+      Lelaki: { total: 0, paid: 0, unpaid: 0, count: 0, unpaidCount: 0 },
+      Perempuan: { total: 0, paid: 0, unpaid: 0, count: 0, unpaidCount: 0 },
+      Kongsi: { total: 0, paid: 0, unpaid: 0, count: 0, unpaidCount: 0 }
     };
 
     let totalActual = 0;
+    let totalPaid = 0;
+    let totalUnpaid = 0;
+    let totalUnpaidCount = 0;
+
     phaseItems.forEach(item => {
-      const val = Number(item.actual) || Number(item.budget) || 0;
+      const { budget, actual, val, paid, unpaid, isPaid } = getItemAmounts(item);
       totalActual += val;
-      const isPaid = item.status === 'Selesai';
+      totalPaid += paid;
+      totalUnpaid += unpaid;
+      if (unpaid > 0) totalUnpaidCount += 1;
+
       const side = item.pihak || 'Kongsi';
-      if (!pStats[side]) pStats[side] = { total: 0, paid: 0, count: 0 };
+      if (!pStats[side]) pStats[side] = { total: 0, paid: 0, unpaid: 0, count: 0, unpaidCount: 0 };
       pStats[side].total += val;
       pStats[side].count += 1;
-      if (isPaid) pStats[side].paid += val;
+      pStats[side].paid += paid;
+      pStats[side].unpaid += unpaid;
+      if (unpaid > 0) pStats[side].unpaidCount += 1;
     });
+
+    let phaseTitleText = 'Semua Fasa Majlis';
+    if (!isAll) {
+      if (activePhaseId === 'tunang') phaseTitleText = 'Pertunangan';
+      else if (activePhaseId === 'nikah') phaseTitleText = 'Akad Nikah';
+      else if (activePhaseId === 'bertandang') phaseTitleText = 'Bertandang Lelaki';
+      else {
+        const foundPhase = appData.phases ? appData.phases.find(p => p.id === activePhaseId) : null;
+        if (foundPhase && foundPhase.title) phaseTitleText = foundPhase.title;
+      }
+    }
 
     // Calculate available distinct category groups for current phase and party
     const groupsMapAll = new Map();
@@ -883,6 +969,104 @@
     const filteredItems = filterExpenseItems(phaseItems);
 
     let html = `
+      <!-- 0. Kad Ringkasan Belum Bayar Pihak Lelaki vs Perempuan (Setiap Majlis / Fasa) -->
+      <div class="unpaid-overview-card">
+        <div class="unpaid-overview-header">
+          <div class="unpaid-header-title">
+            <span class="unpaid-header-icon">⏳</span>
+            <div>
+              <h3 class="unpaid-title-text">Baki Belum Dibayar: ${escapeHtml(phaseTitleText)}</h3>
+              <p class="unpaid-title-sub">Pecahan komitmen belum selesai mengikut pihak penanggung (Lelaki vs Perempuan)</p>
+            </div>
+          </div>
+          <div class="unpaid-total-pill">
+            <span class="unpaid-total-lbl">Jumlah Belum Bayar:</span>
+            <span class="unpaid-total-val">${formatRM(totalUnpaid)}</span>
+            <span class="unpaid-total-count">(${totalUnpaidCount} item)</span>
+          </div>
+        </div>
+
+        <div class="unpaid-cards-grid">
+          <!-- Pihak Lelaki -->
+          <div class="unpaid-party-box box-lelaki ${activePihakFilter === 'Lelaki' ? 'active-filter' : ''}" 
+               onclick="window.dashboardApp.setPartyFilter('${activePihakFilter === 'Lelaki' ? 'all' : 'Lelaki'}')"
+               title="Klik untuk tapis item Pihak Lelaki">
+            <div class="box-top">
+              <div class="box-identity">
+                <span class="box-avatar">🤵</span>
+                <div>
+                  <span class="box-role">Pihak Lelaki</span>
+                  <span class="box-item-count">${pStats.Lelaki.unpaidCount} item belum bayar</span>
+                </div>
+              </div>
+              <span class="box-action-chip ${activePihakFilter === 'Lelaki' ? 'selected' : ''}">
+                ${activePihakFilter === 'Lelaki' ? '✓ Ditapis' : 'Tapis'}
+              </span>
+            </div>
+            <div class="box-main-val text-lelaki">${formatRM(pStats.Lelaki.unpaid)}</div>
+            <div class="box-progress-track">
+              <div class="box-progress-fill fill-lelaki" style="width: ${pStats.Lelaki.total > 0 ? Math.min(100, Math.round((pStats.Lelaki.paid / pStats.Lelaki.total) * 100)) : 100}%"></div>
+            </div>
+            <div class="box-footer-row">
+              <span>Sudah bayar: <strong>${formatRM(pStats.Lelaki.paid)}</strong></span>
+              <span>Jumlah: ${formatRM(pStats.Lelaki.total)}</span>
+            </div>
+          </div>
+
+          <!-- Pihak Perempuan -->
+          <div class="unpaid-party-box box-perempuan ${activePihakFilter === 'Perempuan' ? 'active-filter' : ''}" 
+               onclick="window.dashboardApp.setPartyFilter('${activePihakFilter === 'Perempuan' ? 'all' : 'Perempuan'}')"
+               title="Klik untuk tapis item Pihak Perempuan">
+            <div class="box-top">
+              <div class="box-identity">
+                <span class="box-avatar">👰</span>
+                <div>
+                  <span class="box-role">Pihak Perempuan</span>
+                  <span class="box-item-count">${pStats.Perempuan.unpaidCount} item belum bayar</span>
+                </div>
+              </div>
+              <span class="box-action-chip ${activePihakFilter === 'Perempuan' ? 'selected' : ''}">
+                ${activePihakFilter === 'Perempuan' ? '✓ Ditapis' : 'Tapis'}
+              </span>
+            </div>
+            <div class="box-main-val text-perempuan">${formatRM(pStats.Perempuan.unpaid)}</div>
+            <div class="box-progress-track">
+              <div class="box-progress-fill fill-perempuan" style="width: ${pStats.Perempuan.total > 0 ? Math.min(100, Math.round((pStats.Perempuan.paid / pStats.Perempuan.total) * 100)) : 100}%"></div>
+            </div>
+            <div class="box-footer-row">
+              <span>Sudah bayar: <strong>${formatRM(pStats.Perempuan.paid)}</strong></span>
+              <span>Jumlah: ${formatRM(pStats.Perempuan.total)}</span>
+            </div>
+          </div>
+
+          <!-- Kos Bersama / Kongsi -->
+          <div class="unpaid-party-box box-kongsi ${activePihakFilter === 'Kongsi' ? 'active-filter' : ''}" 
+               onclick="window.dashboardApp.setPartyFilter('${activePihakFilter === 'Kongsi' ? 'all' : 'Kongsi'}')"
+               title="Klik untuk tapis item Kos Bersama">
+            <div class="box-top">
+              <div class="box-identity">
+                <span class="box-avatar">🤝</span>
+                <div>
+                  <span class="box-role">Kos Bersama / Kongsi</span>
+                  <span class="box-item-count">${pStats.Kongsi.unpaidCount} item belum bayar</span>
+                </div>
+              </div>
+              <span class="box-action-chip ${activePihakFilter === 'Kongsi' ? 'selected' : ''}">
+                ${activePihakFilter === 'Kongsi' ? '✓ Ditapis' : 'Tapis'}
+              </span>
+            </div>
+            <div class="box-main-val text-kongsi">${formatRM(pStats.Kongsi.unpaid)}</div>
+            <div class="box-progress-track">
+              <div class="box-progress-fill fill-kongsi" style="width: ${pStats.Kongsi.total > 0 ? Math.min(100, Math.round((pStats.Kongsi.paid / pStats.Kongsi.total) * 100)) : 100}%"></div>
+            </div>
+            <div class="box-footer-row">
+              <span>Sudah bayar: <strong>${formatRM(pStats.Kongsi.paid)}</strong></span>
+              <span>Jumlah: ${formatRM(pStats.Kongsi.total)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 1. Unified Segmented Party Control Bar (Kemas & Jimat Ruang) -->
       <div class="party-segmented-bar">
         <button class="seg-btn ${activePihakFilter === 'all' ? 'active' : ''}" onclick="window.dashboardApp.setPartyFilter('all')">
@@ -891,7 +1075,10 @@
             <span class="seg-name">Semua Pihak</span>
             <span class="seg-badge">${phaseItems.length}</span>
           </div>
-          <div class="seg-amount">${formatRM(totalActual)}</div>
+          <div class="seg-amount-group">
+            <span class="seg-amount-unpaid">Belum: ${formatRM(totalUnpaid)}</span>
+            <span class="seg-amount-total">Jumlah: ${formatRM(totalActual)}</span>
+          </div>
         </button>
 
         <button class="seg-btn seg-perempuan ${activePihakFilter === 'Perempuan' ? 'active' : ''}" onclick="window.dashboardApp.setPartyFilter('Perempuan')">
@@ -900,7 +1087,10 @@
             <span class="seg-name">Pihak Perempuan</span>
             <span class="seg-badge">${pStats.Perempuan.count}</span>
           </div>
-          <div class="seg-amount" style="color:#be185d;">${formatRM(pStats.Perempuan.total)}</div>
+          <div class="seg-amount-group">
+            <span class="seg-amount-unpaid" style="color:#be185d;">Belum: ${formatRM(pStats.Perempuan.unpaid)}</span>
+            <span class="seg-amount-total">Jumlah: ${formatRM(pStats.Perempuan.total)}</span>
+          </div>
         </button>
 
         <button class="seg-btn seg-lelaki ${activePihakFilter === 'Lelaki' ? 'active' : ''}" onclick="window.dashboardApp.setPartyFilter('Lelaki')">
@@ -909,7 +1099,10 @@
             <span class="seg-name">Pihak Lelaki</span>
             <span class="seg-badge">${pStats.Lelaki.count}</span>
           </div>
-          <div class="seg-amount" style="color:#1d4ed8;">${formatRM(pStats.Lelaki.total)}</div>
+          <div class="seg-amount-group">
+            <span class="seg-amount-unpaid" style="color:#1d4ed8;">Belum: ${formatRM(pStats.Lelaki.unpaid)}</span>
+            <span class="seg-amount-total">Jumlah: ${formatRM(pStats.Lelaki.total)}</span>
+          </div>
         </button>
 
         <button class="seg-btn seg-bersama ${activePihakFilter === 'Kongsi' ? 'active' : ''}" onclick="window.dashboardApp.setPartyFilter('Kongsi')">
@@ -918,7 +1111,10 @@
             <span class="seg-name">Kos Bersama</span>
             <span class="seg-badge">${pStats.Kongsi.count}</span>
           </div>
-          <div class="seg-amount" style="color:#7c3aed;">${formatRM(pStats.Kongsi.total)}</div>
+          <div class="seg-amount-group">
+            <span class="seg-amount-unpaid" style="color:#7c3aed;">Belum: ${formatRM(pStats.Kongsi.unpaid)}</span>
+            <span class="seg-amount-total">Jumlah: ${formatRM(pStats.Kongsi.total)}</span>
+          </div>
         </button>
       </div>
 
@@ -1024,12 +1220,29 @@
       let gIndex = 0;
 
       sortedGroupEntries.forEach(([groupTitle, itemsInGroup]) => {
-        const gBudget = itemsInGroup.reduce((acc, c) => acc + (Number(c.budget) || 0), 0);
-        const gActual = itemsInGroup.reduce((acc, c) => acc + (Number(c.actual) || 0), 0);
-        const gPaid = itemsInGroup.reduce((acc, c) => {
-          if (c.status === 'Selesai') return acc + (Number(c.actual) || Number(c.budget) || 0);
-          return acc;
-        }, 0);
+        let gBudget = 0;
+        let gActual = 0;
+        let gPaid = 0;
+        let gUnpaid = 0;
+        const gPihak = {
+          Lelaki: { unpaid: 0, paid: 0, count: 0 },
+          Perempuan: { unpaid: 0, paid: 0, count: 0 },
+          Kongsi: { unpaid: 0, paid: 0, count: 0 }
+        };
+
+        itemsInGroup.forEach(c => {
+          const { budget: b, actual: a, val, paid, unpaid } = getItemAmounts(c);
+          gBudget += b;
+          gActual += (a > 0 ? a : b);
+          gPaid += paid;
+          gUnpaid += unpaid;
+
+          const side = c.pihak || 'Kongsi';
+          if (!gPihak[side]) gPihak[side] = { unpaid: 0, paid: 0, count: 0 };
+          gPihak[side].count += 1;
+          gPihak[side].paid += paid;
+          gPihak[side].unpaid += unpaid;
+        });
 
         const groupKey = itemsInGroup[0].groupKey || getStandardGroupKey(groupTitle, itemsInGroup[0]);
         const tabPrefix = isAll ? 'all' : (currentTab || 'all');
@@ -1054,6 +1267,15 @@
               <div class="group-header-left">
                 <span class="group-header-title">${escapeHtml(groupTitle)}</span>
                 <span class="group-item-count">${itemsInGroup.length} item</span>
+                <div class="group-unpaid-breakdown-tags">
+                  ${gUnpaid === 0 ? `
+                    <span class="unpaid-tag tag-all-paid">✅ Semua Selesai Bayar</span>
+                  ` : `
+                    ${gPihak.Lelaki.unpaid > 0 ? `<span class="unpaid-tag tag-lelaki">🤵 Lelaki Belum: <strong>${formatRM(gPihak.Lelaki.unpaid)}</strong></span>` : ''}
+                    ${gPihak.Perempuan.unpaid > 0 ? `<span class="unpaid-tag tag-perempuan">👰 Perempuan Belum: <strong>${formatRM(gPihak.Perempuan.unpaid)}</strong></span>` : ''}
+                    ${gPihak.Kongsi.unpaid > 0 ? `<span class="unpaid-tag tag-kongsi">🤝 Kongsi Belum: <strong>${formatRM(gPihak.Kongsi.unpaid)}</strong></span>` : ''}
+                  `}
+                </div>
               </div>
               <div class="group-header-right">
                 <div class="group-subtotal-chip">
@@ -1061,7 +1283,9 @@
                   <span style="color:var(--border-color);">|</span>
                   <span>Sebenar: <strong style="color:var(--primary);">${formatRM(gActual)}</strong></span>
                   <span style="color:var(--border-color);">|</span>
-                  <span style="color:var(--emerald-dark);">Sudah Bayar: <strong>${formatRM(gPaid)}</strong></span>
+                  <span style="color:var(--emerald-dark);">Sudah: <strong>${formatRM(gPaid)}</strong></span>
+                  <span style="color:var(--border-color);">|</span>
+                  <span style="color:#b45309; font-weight:700;">⏳ Belum: <strong>${formatRM(gUnpaid)}</strong></span>
                 </div>
                 <button type="button" class="btn-group-add-item" onclick="event.stopPropagation(); window.dashboardApp.openAddExpenseModalWithGroup('${escapeHtml(groupTitle).replace(/'/g, "\\'")}', '${escapeHtml(itemsInGroup[0]?.phase || currentTab)}', '${escapeHtml(itemsInGroup[0]?.pihak || 'Kongsi')}')" title="Tambah item dalam ${escapeHtml(groupTitle)}">
                   <span>➕</span> Tambah
@@ -1095,6 +1319,14 @@
               </div>
 
               <div class="group-card-footer">
+                <div class="group-footer-stat-summary">
+                  <span class="footer-stat-lead">📊 Status Seksyen:</span>
+                  <span class="footer-stat-chip paid">✅ Sudah Bayar: ${formatRM(gPaid)}</span>
+                  <span class="footer-stat-chip unpaid">⏳ Belum Bayar: ${formatRM(gUnpaid)}</span>
+                  ${gPihak.Lelaki.unpaid > 0 ? `<span class="footer-stat-chip lelaki">🤵 Belah Lelaki: ${formatRM(gPihak.Lelaki.unpaid)}</span>` : ''}
+                  ${gPihak.Perempuan.unpaid > 0 ? `<span class="footer-stat-chip perempuan">👰 Belah Perempuan: ${formatRM(gPihak.Perempuan.unpaid)}</span>` : ''}
+                  ${gPihak.Kongsi.unpaid > 0 ? `<span class="footer-stat-chip kongsi">🤝 Bersama: ${formatRM(gPihak.Kongsi.unpaid)}</span>` : ''}
+                </div>
                 <button type="button" class="group-footer-add-btn" onclick="window.dashboardApp.openAddExpenseModalWithGroup('${escapeHtml(groupTitle).replace(/'/g, "\\'")}', '${escapeHtml(itemsInGroup[0]?.phase || currentTab)}', '${escapeHtml(itemsInGroup[0]?.pihak || 'Kongsi')}')">
                   <span>➕</span> Tambah Item Baharu ke dalam <strong>${escapeHtml(groupTitle)}</strong>
                 </button>

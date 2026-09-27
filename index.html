@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Perkahwinan: Aisyah & Zuhair ("Road to Halal")</title>
   <meta name="description" content="Aplikasi pengurusan perbelanjaan dan senarai kehadiran tetamu perkahwinan Aisyah & Zuhair.">
-  <link rel="stylesheet" href="css/style.css?v=3.3">
+  <link rel="stylesheet" href="css/style.css?v=3.4">
   <!-- Chart.js CDN for interactive visual analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -159,9 +159,10 @@
             <div class="kpi-icon-wrap" style="background:#eff6ff; color:#1d4ed8;">⏳</div>
           </div>
           <div class="kpi-value" id="kpi-total-balance" style="color:#1d4ed8;">RM 0.00</div>
-          <div class="kpi-subtext">
-            <span>Perlu Diselesaikan</span>
-            <span style="color:#1d4ed8; font-weight:700;">Belum Bayar</span>
+          <div class="kpi-subtext" style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px; font-size:0.75rem;">
+            <span style="color:#1d4ed8; font-weight:700;">🤵 L: <strong id="kpi-unpaid-lelaki">RM 0.00</strong></span>
+            <span style="color:var(--border-color);">•</span>
+            <span style="color:#be185d; font-weight:700;">👰 P: <strong id="kpi-unpaid-perempuan">RM 0.00</strong></span>
           </div>
         </div>
 
@@ -244,6 +245,14 @@
             <div class="phase-stat-label">Baki Belum Bayar</div>
             <div class="phase-stat-val" id="tunang-stat-balance" style="color:#2563eb;">RM 0.00</div>
           </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">🤵 Belum (Lelaki)</div>
+            <div class="phase-stat-val" id="tunang-stat-unpaid-lelaki" style="color:#1d4ed8; font-weight:800;">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">👰 Belum (Perempuan)</div>
+            <div class="phase-stat-val" id="tunang-stat-unpaid-perempuan" style="color:#be185d; font-weight:800;">RM 0.00</div>
+          </div>
         </div>
       </div>
       <div id="tunang-content-area"></div>
@@ -278,6 +287,14 @@
             <div class="phase-stat-label">Baki Belum Bayar</div>
             <div class="phase-stat-val" id="nikah-stat-balance" style="color:#2563eb;">RM 0.00</div>
           </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">🤵 Belum (Lelaki)</div>
+            <div class="phase-stat-val" id="nikah-stat-unpaid-lelaki" style="color:#1d4ed8; font-weight:800;">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">👰 Belum (Perempuan)</div>
+            <div class="phase-stat-val" id="nikah-stat-unpaid-perempuan" style="color:#be185d; font-weight:800;">RM 0.00</div>
+          </div>
         </div>
       </div>
       <div id="nikah-content-area"></div>
@@ -311,6 +328,14 @@
           <div class="phase-stat-item">
             <div class="phase-stat-label">Baki Belum Bayar</div>
             <div class="phase-stat-val" id="bertandang-stat-balance" style="color:#2563eb;">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">🤵 Belum (Lelaki)</div>
+            <div class="phase-stat-val" id="bertandang-stat-unpaid-lelaki" style="color:#1d4ed8; font-weight:800;">RM 0.00</div>
+          </div>
+          <div class="phase-stat-item">
+            <div class="phase-stat-label">👰 Belum (Perempuan)</div>
+            <div class="phase-stat-val" id="bertandang-stat-unpaid-perempuan" style="color:#be185d; font-weight:800;">RM 0.00</div>
           </div>
         </div>
       </div>
@@ -819,7 +844,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="data/weddingData.js?v=3.3"></script>
-  <script src="js/app.js?v=3.3"></script>
+  <script src="data/weddingData.js?v=3.4"></script>
+  <script src="js/app.js?v=3.4"></script>
 </body>
 </html>
