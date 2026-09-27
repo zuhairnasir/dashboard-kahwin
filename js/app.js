@@ -2957,16 +2957,25 @@
   }
 
   function checkUrlForGistConfig() {
-    const hash = window.location.hash;
+    let syncParam = '';
+    const hash = window.location.hash || '';
     if (hash && hash.includes('sync=')) {
+      const match = hash.match(/sync=([^&]+)/);
+      if (match) syncParam = match[1];
+    }
+    if (!syncParam && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      syncParam = params.get('sync') || '';
+    }
+
+    if (syncParam) {
       try {
-        const param = hash.replace(/^#sync=/, '');
-        const decoded = decodeURIComponent(param);
+        const decoded = decodeURIComponent(syncParam);
         const [token, gistId] = decoded.split(':::');
         if (gistId) {
-          const cfg = { token: token || '', gistId, autoSync: true, lastSynced: null };
+          const cfg = { token: token || '', gistId: gistId.trim(), autoSync: true, lastSynced: null };
           saveGistConfig(cfg);
-          history.replaceState(null, '', window.location.pathname + window.location.search);
+          history.replaceState(null, '', window.location.pathname);
           showToast('🎉 Berjaya menyambung ke GitHub Gist dari pautan!', 'success');
           pullDataFromGist(true);
         }
