@@ -1945,5 +1945,25 @@ tr.row-party-kongsi td:first-child {
   background: var(--primary-light);
 }
 
+/* Animasi kilauan khas untuk item yang baru dikemaskini */
+@keyframes rowGlowPulse {
+  0% {
+    background-color: rgba(217, 119, 6, 0.28);
+    box-shadow: 0 0 16px rgba(217, 119, 6, 0.4);
+  }
+  50% {
+    background-color: rgba(217, 119, 6, 0.14);
+    box-shadow: 0 0 8px rgba(217, 119, 6, 0.2);
+  }
+  100% {
+    background-color: rgba(217, 119, 6, 0.26);
+    box-shadow: 0 0 14px rgba(217, 119, 6, 0.35);
+  }
+}
 
-
+.row-just-updated {
+  animation: rowGlowPulse 1.2s ease-in-out infinite alternate !important;
+  outline: 2px solid #d97706 !important;
+  z-index: 5;
+  position: relative;
+}

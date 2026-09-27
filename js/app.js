@@ -736,6 +736,11 @@
     stepsGrid.innerHTML = stepsHtml;
   }
 
+  // Alias untuk serasi dengan panggilan renderMilestones
+  function renderMilestones() {
+    renderMilestoneTracker();
+  }
+
   // --- Phase Banners Update ---
   function renderPhaseBanners() {
     const phases = ['tunang', 'nikah', 'bertandang'];
@@ -815,12 +820,22 @@
       saveData();
     }
 
-    // Simpan rekod kad yang sedang dibuka di skrin supaya tidak tertutup sendiri semasa render
-    document.querySelectorAll('.group-card:not(.collapsed)').forEach(el => {
-      if (el.id) expandedGroupCardIds.add(el.id);
-    });
+    // Simpan rekod kad yang sedang dibuka di skrin aktif supaya tidak tertutup sendiri semasa render
+    const activePane = document.querySelector('.tab-pane.active');
+    if (activePane) {
+      activePane.querySelectorAll('.group-card:not(.collapsed)').forEach(el => {
+        if (el.id) expandedGroupCardIds.add(el.id);
+        const gk = el.dataset.groupKey;
+        if (gk) {
+          expandedGroupCardIds.add(gk);
+          expandedGroupCardIds.add('card-' + gk);
+        }
+      });
+    }
     if (lastActiveGroupKey) {
+      expandedGroupCardIds.add(lastActiveGroupKey);
       expandedGroupCardIds.add('card-' + lastActiveGroupKey);
+      expandedGroupCardIds.add(`card-${isAll ? 'all' : (activePhaseId || 'all')}-${lastActiveGroupKey}`);
     }
 
     // Get items for current phase
@@ -1017,21 +1032,24 @@
         }, 0);
 
         const groupKey = itemsInGroup[0].groupKey || getStandardGroupKey(groupTitle, itemsInGroup[0]);
-        const cardId = 'card-' + escapeHtml(groupKey);
+        const tabPrefix = isAll ? 'all' : (currentTab || 'all');
+        const cardId = `card-${tabPrefix}-${escapeHtml(groupKey)}`;
 
         // Jika ada kad yang sedang dibuka, pastikan ia kekal dibuka (tidak tertutup sendiri)
         let isCollapsed;
         if (activeCategoryFilter !== 'all') {
           isCollapsed = false;
         } else if (expandedGroupCardIds.size > 0) {
-          isCollapsed = !expandedGroupCardIds.has(cardId);
+          isCollapsed = !expandedGroupCardIds.has(cardId) &&
+                        !expandedGroupCardIds.has(groupKey) &&
+                        !expandedGroupCardIds.has('card-' + groupKey);
         } else {
           isCollapsed = lastActiveGroupKey ? (groupKey !== lastActiveGroupKey) : (gIndex > 0);
         }
         gIndex++;
 
         blockHtml += `
-          <div class="group-card ${isCollapsed ? 'collapsed' : ''}" id="${cardId}">
+          <div class="group-card ${isCollapsed ? 'collapsed' : ''}" id="${cardId}" data-group-key="${escapeHtml(groupKey)}">
             <div class="group-card-header" onclick="window.dashboardApp.toggleGroupCard(this)">
               <div class="group-header-left">
                 <span class="group-header-title">${escapeHtml(groupTitle)}</span>
@@ -1222,15 +1240,26 @@
   }
 
   function expandAllGroups(expand) {
-    const cards = document.querySelectorAll('.group-card');
+    const activePane = document.querySelector('.tab-pane.active') || document;
+    const cards = activePane.querySelectorAll('.group-card');
     cards.forEach(card => {
+      const groupKey = card.dataset.groupKey;
       if (expand) {
         card.classList.remove('collapsed');
         if (card.id) expandedGroupCardIds.add(card.id);
+        if (groupKey) {
+          expandedGroupCardIds.add(groupKey);
+          expandedGroupCardIds.add('card-' + groupKey);
+        }
         const icon = card.querySelector('.group-collapse-icon');
         if (icon) icon.textContent = '▼';
       } else {
         card.classList.add('collapsed');
+        if (card.id) expandedGroupCardIds.delete(card.id);
+        if (groupKey) {
+          expandedGroupCardIds.delete(groupKey);
+          expandedGroupCardIds.delete('card-' + groupKey);
+        }
         const icon = card.querySelector('.group-collapse-icon');
         if (icon) icon.textContent = '▶';
       }
@@ -1245,15 +1274,24 @@
     const card = headerEl.closest('.group-card');
     if (!card) return;
     const isCollapsed = card.classList.contains('collapsed');
+    const groupKey = card.dataset.groupKey;
     if (isCollapsed) {
       card.classList.remove('collapsed');
       if (card.id) expandedGroupCardIds.add(card.id);
+      if (groupKey) {
+        expandedGroupCardIds.add(groupKey);
+        expandedGroupCardIds.add('card-' + groupKey);
+      }
       const icon = card.querySelector('.group-collapse-icon');
       if (icon) icon.textContent = '▼';
       card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
       card.classList.add('collapsed');
       if (card.id) expandedGroupCardIds.delete(card.id);
+      if (groupKey) {
+        expandedGroupCardIds.delete(groupKey);
+        expandedGroupCardIds.delete('card-' + groupKey);
+      }
       const icon = card.querySelector('.group-collapse-icon');
       if (icon) icon.textContent = '▶';
     }
@@ -1334,6 +1372,9 @@
 
     saveData();
     renderExpensesView();
+    renderPhaseBanners();
+    updateHeaderSummary();
+    renderMilestoneTracker();
     window.scrollTo({ top: scrollY, behavior: 'instant' });
   }
 
@@ -2205,20 +2246,32 @@
       }
 
       lastActiveGroupKey = groupKey;
+      expandedGroupCardIds.add(groupKey);
       expandedGroupCardIds.add('card-' + groupKey);
+      const tabPrefix = currentTab === 'all' ? 'all' : (currentTab || 'all');
+      expandedGroupCardIds.add(`card-${tabPrefix}-${groupKey}`);
 
       saveData();
       closeModal('expense-modal');
 
       // KEKAL BERADA DI HALAMAN / TAB SEMASA: Jangan sekali-kali lompat ke pages/tab lain
-      renderExpensesView();
+      // Hanya tukar tab jika pengguna sengaja memilih fasa berbeza dalam dropdown modal
+      if (currentTab !== 'all' && currentTab !== phase) {
+        switchTab(phase, groupKey);
+      } else {
+        renderExpensesView();
+      }
+
       renderPhaseBanners();
       updateHeaderSummary();
-      renderMilestones();
+      renderMilestoneTracker();
 
       // Pastikan kad seksyen tersebut kekal terbuka dan skrin fokus tepat ke item berkenaan
       setTimeout(() => {
-        const cardEl = document.getElementById(`card-${groupKey}`);
+        const activePane = document.querySelector('.tab-pane.active') || document;
+        let cardEl = activePane.querySelector(`.group-card[data-group-key="${groupKey}"]`) || 
+                     activePane.querySelector(`#card-${tabPrefix}-${groupKey}`) ||
+                     activePane.querySelector(`#card-${groupKey}`);
         if (cardEl) {
           if (cardEl.classList.contains('collapsed')) {
             cardEl.classList.remove('collapsed');
@@ -2227,7 +2280,7 @@
           }
         }
 
-        let rowEl = document.querySelector(`tr[data-id="${targetExpenseId}"]`);
+        let rowEl = activePane.querySelector(`tr[data-id="${targetExpenseId}"]`);
         
         // Jika item tidak dijumpai akibat penapis pihak/status yang aktif, laras semula penapis supaya item muncul
         if (!rowEl && (activePihakFilter !== 'all' || activeCategoryFilter !== 'all' || expenseFilters.status !== 'all')) {
@@ -2235,26 +2288,42 @@
           activeCategoryFilter = 'all';
           expenseFilters.status = 'all';
           renderExpensesView();
-          rowEl = document.querySelector(`tr[data-id="${targetExpenseId}"]`);
+          const refreshedPane = document.querySelector('.tab-pane.active') || document;
+          rowEl = refreshedPane.querySelector(`tr[data-id="${targetExpenseId}"]`);
         }
 
         if (rowEl) {
           const rect = rowEl.getBoundingClientRect();
-          const absoluteTop = window.scrollY + rect.top;
-          const targetTop = Math.max(0, absoluteTop - (window.innerHeight / 2) + (rect.height / 2));
-          window.scrollTo({ top: targetTop, behavior: 'smooth' });
+          const headerHeight = 90; // Ketinggian sticky header
+          const isRowInView = (rect.top >= headerHeight && rect.bottom <= window.innerHeight - 30);
 
-          rowEl.style.transition = 'background-color 0.4s ease, box-shadow 0.4s ease';
-          rowEl.style.backgroundColor = 'rgba(217, 119, 6, 0.22)';
-          rowEl.style.outline = '2px solid rgba(217, 119, 6, 0.55)';
+          // Hanya lakukan scroll jika baris item terkeluar daripada pandangan skrin pengguna
+          if (!isRowInView) {
+            const absoluteTop = window.scrollY + rect.top;
+            const targetTop = Math.max(0, absoluteTop - (window.innerHeight / 2) + (rect.height / 2));
+            window.scrollTo({ top: targetTop, behavior: 'smooth' });
+          }
+
+          // Serlahkan item yang baru dikemaskini dengan animasi kilauan emas
+          rowEl.classList.add('row-just-updated');
+          rowEl.style.transition = 'all 0.3s ease';
+          rowEl.style.backgroundColor = 'rgba(217, 119, 6, 0.28)';
+          rowEl.style.outline = '2px solid rgba(217, 119, 6, 0.7)';
+          rowEl.style.boxShadow = '0 0 16px rgba(217, 119, 6, 0.35)';
+
           setTimeout(() => {
             rowEl.style.backgroundColor = '';
             rowEl.style.outline = '';
-          }, 2500);
+            rowEl.style.boxShadow = '';
+            rowEl.classList.remove('row-just-updated');
+          }, 3500);
         } else if (cardEl) {
           const cRect = cardEl.getBoundingClientRect();
-          const cTop = window.scrollY + cRect.top - 80;
-          window.scrollTo({ top: Math.max(0, cTop), behavior: 'smooth' });
+          const headerHeight = 90;
+          if (cRect.top < headerHeight || cRect.bottom > window.innerHeight) {
+            const cTop = window.scrollY + cRect.top - 80;
+            window.scrollTo({ top: Math.max(0, cTop), behavior: 'smooth' });
+          }
         }
       }, 70);
     } finally {
@@ -2283,7 +2352,7 @@
       renderExpensesView();
       renderPhaseBanners();
       updateHeaderSummary();
-      renderMilestones();
+      renderMilestoneTracker();
       window.scrollTo({ top: currentScrollY, behavior: 'instant' });
       showToast(`Item "${item.description}" telah dipadam.`, 'info', true);
     }
