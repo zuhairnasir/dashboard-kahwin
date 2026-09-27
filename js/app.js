@@ -395,7 +395,95 @@
     }
   }
 
-  // --- Helpers ---
+  // --- Helpers & Standard Group Ordering ---
+  const PHASE_DEFAULT_GROUPS = {
+    all: [
+      "📜 Dokumen & Prosedur Nikah",
+      "📜 Upacara Akad & Mas Kahwin",
+      "👰 Part Pengantin Perempuan",
+      "🤵 Part Pengantin Lelaki",
+      "🎁 Barang Hantaran (Lelaki Sediakan)",
+      "🎁 Barang Hantaran (Perempuan Sediakan)",
+      "🏰 Lokasi, Dewan & Khemah",
+      "🍽️ Jamuan & Katering",
+      "📸 Fotografi & Media",
+      "🎵 Hiburan & PA System",
+      "💌 Jemputan & Doorgift",
+      "🚙 Penginapan & Logistik",
+      "✨ Lain-lain Persiapan"
+    ],
+    tunang: [
+      "👰 Part Pengantin Perempuan",
+      "🤵 Part Pengantin Lelaki",
+      "🎁 Barang Hantaran (Lelaki Sediakan)",
+      "🎁 Barang Hantaran (Perempuan Sediakan)",
+      "🏰 Lokasi, Dewan & Khemah",
+      "🍽️ Jamuan & Katering",
+      "📸 Fotografi & Media",
+      "💌 Jemputan & Doorgift",
+      "🚙 Penginapan & Logistik",
+      "✨ Lain-lain Persiapan"
+    ],
+    nikah: [
+      "📜 Dokumen & Prosedur Nikah",
+      "📜 Upacara Akad & Mas Kahwin",
+      "👰 Part Pengantin Perempuan",
+      "🤵 Part Pengantin Lelaki",
+      "🎁 Barang Hantaran (Lelaki Sediakan)",
+      "🎁 Barang Hantaran (Perempuan Sediakan)",
+      "🏰 Lokasi, Dewan & Khemah",
+      "🍽️ Jamuan & Katering",
+      "📸 Fotografi & Media",
+      "💌 Jemputan & Doorgift",
+      "🚙 Penginapan & Logistik",
+      "🎵 Hiburan & PA System",
+      "✨ Lain-lain Persiapan"
+    ],
+    sanding: [
+      "👰 Part Pengantin Perempuan",
+      "🤵 Part Pengantin Lelaki",
+      "🏰 Lokasi, Dewan & Khemah",
+      "🍽️ Jamuan & Katering",
+      "📸 Fotografi & Media",
+      "🎵 Hiburan & PA System",
+      "💌 Jemputan & Doorgift",
+      "🚙 Penginapan & Logistik",
+      "🎁 Barang Hantaran (Lelaki Sediakan)",
+      "🎁 Barang Hantaran (Perempuan Sediakan)",
+      "✨ Lain-lain Persiapan"
+    ],
+    bertandang: [
+      "🤵 Part Pengantin Lelaki",
+      "👰 Part Pengantin Perempuan",
+      "🏰 Lokasi, Dewan & Khemah",
+      "🍽️ Jamuan & Katering",
+      "📸 Fotografi & Media",
+      "🎵 Hiburan & PA System",
+      "💌 Jemputan & Doorgift",
+      "🚙 Penginapan & Logistik",
+      "🎁 Barang Hantaran (Lelaki Sediakan)",
+      "🎁 Barang Hantaran (Perempuan Sediakan)",
+      "✨ Lain-lain Persiapan"
+    ]
+  };
+
+  function getGroupOrderScore(groupTitle, phase) {
+    if (!groupTitle) return 999;
+    const targetPhase = (phase && PHASE_DEFAULT_GROUPS[phase]) ? phase : 'all';
+    const list = PHASE_DEFAULT_GROUPS[targetPhase] || PHASE_DEFAULT_GROUPS.all;
+
+    const norm = groupTitle.trim().toLowerCase();
+    const idx = list.findIndex(item => {
+      const itemNorm = item.trim().toLowerCase();
+      if (norm === itemNorm) return true;
+      const strippedItem = itemNorm.replace(/^[^\w\s]+/, '').trim();
+      const strippedNorm = norm.replace(/^[^\w\s]+/, '').trim();
+      return strippedNorm.includes(strippedItem) || strippedItem.includes(strippedNorm);
+    });
+
+    return idx !== -1 ? idx : 999;
+  }
+
   function formatRM(val) {
     const num = Number(val) || 0;
     return 'RM ' + num.toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -718,6 +806,9 @@
       if (item.status === 'Selesai') gObj.paid += val;
     });
     const availableGroups = Array.from(groupsMapAll.values());
+    availableGroups.sort((a, b) => {
+      return getGroupOrderScore(a.title, activePhaseId) - getGroupOrderScore(b.title, activePhaseId);
+    });
 
     // Filter items based on active filters
     const filteredItems = filterExpenseItems(phaseItems);
@@ -854,10 +945,16 @@
         groupsMap.get(groupTitle).push(item);
       });
 
+      // Susun seksyen mengikut turutan perkahwinan yang tepat dan betul
+      const currentPhaseContext = isAll ? 'all' : currentTab;
+      const sortedGroupEntries = Array.from(groupsMap.entries()).sort((a, b) => {
+        return getGroupOrderScore(a[0], currentPhaseContext) - getGroupOrderScore(b[0], currentPhaseContext);
+      });
+
       let blockHtml = `<div class="groups-container">`;
       let gIndex = 0;
 
-      groupsMap.forEach((itemsInGroup, groupTitle) => {
+      sortedGroupEntries.forEach(([groupTitle, itemsInGroup]) => {
         const gBudget = itemsInGroup.reduce((acc, c) => acc + (Number(c.budget) || 0), 0);
         const gActual = itemsInGroup.reduce((acc, c) => acc + (Number(c.actual) || 0), 0);
         const gPaid = itemsInGroup.reduce((acc, c) => {
@@ -1744,56 +1841,6 @@
     }).join('');
   }
 
-  // --- Phase-Specific Default Groups Map ---
-  const PHASE_DEFAULT_GROUPS = {
-    tunang: [
-      "👰 Part Pengantin Perempuan",
-      "🤵 Part Pengantin Lelaki",
-      "🎁 Barang Hantaran (Perempuan Sediakan)",
-      "🎁 Barang Hantaran (Lelaki Sediakan)",
-      "🏰 Lokasi, Dewan & Khemah",
-      "💌 Jemputan & Doorgift",
-      "🚙 Penginapan & Logistik",
-      "📸 Fotografi & Media",
-      "✨ Lain-lain Persiapan"
-    ],
-    nikah: [
-      "📜 Dokumen & Prosedur Nikah",
-      "📜 Upacara Akad & Mas Kahwin",
-      "👰 Part Pengantin Perempuan",
-      "🤵 Part Pengantin Lelaki",
-      "🎁 Barang Hantaran (Perempuan Sediakan)",
-      "🎁 Barang Hantaran (Lelaki Sediakan)",
-      "🏰 Lokasi, Dewan & Khemah",
-      "💌 Jemputan & Doorgift",
-      "🚙 Penginapan & Logistik",
-      "📸 Fotografi & Media",
-      "✨ Lain-lain Persiapan"
-    ],
-    sanding: [
-      "👰 Part Pengantin Perempuan",
-      "🤵 Part Pengantin Lelaki",
-      "🍽️ Jamuan & Katering",
-      "🏰 Lokasi, Dewan & Khemah",
-      "💌 Jemputan & Doorgift",
-      "📸 Fotografi & Media",
-      "🎵 Hiburan & PA System",
-      "🚙 Penginapan & Logistik",
-      "✨ Lain-lain Persiapan"
-    ],
-    bertandang: [
-      "👰 Part Pengantin Perempuan",
-      "🤵 Part Pengantin Lelaki",
-      "🍽️ Jamuan & Katering",
-      "🏰 Lokasi, Dewan & Khemah",
-      "💌 Jemputan & Doorgift",
-      "📸 Fotografi & Media",
-      "🎵 Hiburan & PA System",
-      "🚙 Penginapan & Logistik",
-      "✨ Lain-lain Persiapan"
-    ]
-  };
-
   // --- Helper to populate groupTitle select options based on phase ---
   function populateGroupTitleOptions(selectedTitle = '', phase = null) {
     const select = document.getElementById('modal-exp-grouptitle');
@@ -2021,7 +2068,7 @@
     } else {
       pushHistoryState(`Tambah '${desc}'`);
       targetExpenseId = 'exp_' + Date.now();
-      appData.expenses.unshift({
+      const newExpenseItem = {
         id: targetExpenseId,
         phase,
         phaseTitle,
@@ -2035,8 +2082,38 @@
         status,
         notes,
         hasReceipt: false
-      });
-      showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian "${groupTitle}".`, 'success', true);
+      };
+
+      // Cari item terakhir dalam kumpulan & fasa yang sama supaya item baharu berada di list bawah (bukan di atas)
+      let lastIndexInGroup = -1;
+      for (let i = appData.expenses.length - 1; i >= 0; i--) {
+        const item = appData.expenses[i];
+        if (item.phase === phase && (item.groupTitle === groupTitle || item.groupKey === groupKey)) {
+          lastIndexInGroup = i;
+          break;
+        }
+      }
+
+      if (lastIndexInGroup !== -1) {
+        // Masukkan item baru tepat di bawah item terakhir kumpulan tersebut
+        appData.expenses.splice(lastIndexInGroup + 1, 0, newExpenseItem);
+      } else {
+        // Jika kumpulan belum ada dalam fasa ini, masukkan di bahagian bawah senarai fasa atau di hujung array
+        let lastIndexInPhase = -1;
+        for (let i = appData.expenses.length - 1; i >= 0; i--) {
+          if (appData.expenses[i].phase === phase) {
+            lastIndexInPhase = i;
+            break;
+          }
+        }
+        if (lastIndexInPhase !== -1) {
+          appData.expenses.splice(lastIndexInPhase + 1, 0, newExpenseItem);
+        } else {
+          appData.expenses.push(newExpenseItem);
+        }
+      }
+
+      showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian bawah "${groupTitle}".`, 'success', true);
     }
 
     // Check if a receipt file was uploaded in modal
@@ -2196,7 +2273,7 @@
     } else {
       pushHistoryState(`Tambah tetamu '${nama}'`);
       const newId = 'gst_' + Date.now();
-      appData.guests.unshift({
+      appData.guests.push({
         id: newId,
         nama,
         pax,
