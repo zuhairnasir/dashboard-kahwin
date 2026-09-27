@@ -22,6 +22,16 @@
   let activePihakFilter = 'all'; // 'all', 'Lelaki', 'Perempuan', 'Kongsi'
   let activeCategoryFilter = 'all'; // 'all' atau nama kategori kumpulan spesifik
   let lastActiveGroupKey = null; // groupKey yang baru ditambah atau diedit
+  let expandedGroupCardIds = new Set(); // Menyimpan rekod kad yang sedang terbuka supaya tidak tertutup sendiri
+
+  function getStandardGroupKey(groupTitle, fallbackItem = null) {
+    if (fallbackItem && fallbackItem.groupKey && fallbackItem.groupTitle === groupTitle) {
+      return fallbackItem.groupKey;
+    }
+    const match = appData.expenses.find(e => e.groupTitle === groupTitle && e.groupKey);
+    if (match) return match.groupKey;
+    return (groupTitle || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'group-custom';
+  }
 
   const expenseFilters = {
     search: '',
@@ -460,11 +470,15 @@
 
   // --- Tab Navigation ---
   function switchTab(tabId, targetGroupKey = null) {
+    if (currentTab !== tabId) {
+      expandedGroupCardIds.clear();
+    }
     currentTab = tabId;
     activePihakFilter = 'all'; // reset sub-filter on tab change
     activeCategoryFilter = 'all'; // reset category filter on tab change
     if (targetGroupKey) {
       lastActiveGroupKey = targetGroupKey;
+      expandedGroupCardIds.add('card-' + targetGroupKey);
     }
 
     document.querySelectorAll('.nav-tab-btn').forEach(btn => {
@@ -502,6 +516,14 @@
     const containerId = isAll ? 'all-content-area' : `${activePhaseId}-content-area`;
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    // Simpan rekod kad yang sedang dibuka di skrin supaya tidak tertutup sendiri semasa render
+    document.querySelectorAll('.group-card:not(.collapsed)').forEach(el => {
+      if (el.id) expandedGroupCardIds.add(el.id);
+    });
+    if (lastActiveGroupKey) {
+      expandedGroupCardIds.add('card-' + lastActiveGroupKey);
+    }
 
     // Get items for current phase
     const phaseItems = isAll ? appData.expenses : appData.expenses.filter(e => e.phase === activePhaseId);
@@ -687,14 +709,22 @@
           return acc;
         }, 0);
 
-        const groupKey = itemsInGroup[0].groupKey || 'group_' + gIndex;
-        // If specific category is selected, it's open.
-        // If "all" is selected, keep lastActiveGroupKey open or default to first group open
-        const isCollapsed = activeCategoryFilter === 'all' && (lastActiveGroupKey ? groupKey !== lastActiveGroupKey : gIndex > 0);
+        const groupKey = itemsInGroup[0].groupKey || getStandardGroupKey(groupTitle, itemsInGroup[0]);
+        const cardId = 'card-' + escapeHtml(groupKey);
+
+        // Jika ada kad yang sedang dibuka, pastikan ia kekal dibuka (tidak tertutup sendiri)
+        let isCollapsed;
+        if (activeCategoryFilter !== 'all') {
+          isCollapsed = false;
+        } else if (expandedGroupCardIds.size > 0) {
+          isCollapsed = !expandedGroupCardIds.has(cardId);
+        } else {
+          isCollapsed = lastActiveGroupKey ? (groupKey !== lastActiveGroupKey) : (gIndex > 0);
+        }
         gIndex++;
 
         blockHtml += `
-          <div class="group-card ${isCollapsed ? 'collapsed' : ''}" id="card-${escapeHtml(groupKey)}">
+          <div class="group-card ${isCollapsed ? 'collapsed' : ''}" id="${cardId}">
             <div class="group-card-header" onclick="window.dashboardApp.toggleGroupCard(this)">
               <div class="group-header-left">
                 <span class="group-header-title">${escapeHtml(groupTitle)}</span>
@@ -711,7 +741,7 @@
                 <button type="button" class="btn-group-add-item" onclick="event.stopPropagation(); window.dashboardApp.openAddExpenseModalWithGroup('${escapeHtml(groupTitle).replace(/'/g, "\\'")}', '${escapeHtml(itemsInGroup[0]?.phase || currentTab)}', '${escapeHtml(itemsInGroup[0]?.pihak || 'Kongsi')}')" title="Tambah item dalam ${escapeHtml(groupTitle)}">
                   <span>➕</span> Tambah
                 </button>
-                <span class="group-collapse-icon">▼</span>
+                <span class="group-collapse-icon">${isCollapsed ? '▶' : '▼'}</span>
               </div>
             </div>
 
@@ -873,10 +903,19 @@
     cards.forEach(card => {
       if (expand) {
         card.classList.remove('collapsed');
+        if (card.id) expandedGroupCardIds.add(card.id);
+        const icon = card.querySelector('.group-collapse-icon');
+        if (icon) icon.textContent = '▼';
       } else {
         card.classList.add('collapsed');
+        const icon = card.querySelector('.group-collapse-icon');
+        if (icon) icon.textContent = '▶';
       }
     });
+    if (!expand) {
+      expandedGroupCardIds.clear();
+      lastActiveGroupKey = null;
+    }
   }
 
   function toggleGroupCard(headerEl) {
@@ -884,17 +923,16 @@
     if (!card) return;
     const isCollapsed = card.classList.contains('collapsed');
     if (isCollapsed) {
-      // Auto-accordion: bila buka satu kad, tutup kad lain secara automatik supaya kemas & tak perlu tutup satu-satu
-      const container = card.closest('.groups-container');
-      if (container) {
-        container.querySelectorAll('.group-card').forEach(c => {
-          if (c !== card) c.classList.add('collapsed');
-        });
-      }
       card.classList.remove('collapsed');
+      if (card.id) expandedGroupCardIds.add(card.id);
+      const icon = card.querySelector('.group-collapse-icon');
+      if (icon) icon.textContent = '▼';
       card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
       card.classList.add('collapsed');
+      if (card.id) expandedGroupCardIds.delete(card.id);
+      const icon = card.querySelector('.group-collapse-icon');
+      if (icon) icon.textContent = '▶';
     }
   }
 
@@ -952,6 +990,12 @@
     const item = appData.expenses.find(e => e.id === expenseId);
     if (!item) return;
 
+    const groupKey = item.groupKey || getStandardGroupKey(item.groupTitle || '', item);
+    lastActiveGroupKey = groupKey;
+    expandedGroupCardIds.add('card-' + groupKey);
+
+    const scrollY = window.scrollY;
+
     if (item.status === 'Selesai') {
       item.status = 'Belum';
       showToast(`'${item.description}' ditukar ke Belum Bayar.`, 'info');
@@ -965,6 +1009,7 @@
 
     saveData();
     renderExpensesView();
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
   }
 
   // --- Receipt Storage & Modal Handling ---
@@ -1492,6 +1537,8 @@
   function openAddExpenseModal(presetPhase = null) {
     editingExpenseId = null;
     document.getElementById('expense-modal-title').textContent = 'Tambah Perbelanjaan Baharu';
+    const submitBtn = document.querySelector('#expense-form button[type="submit"]');
+    if (submitBtn) submitBtn.textContent = 'Simpan Perbelanjaan';
 
     const banner = document.getElementById('modal-group-preset-banner');
     if (banner) banner.style.display = 'none';
@@ -1532,6 +1579,8 @@
 
     if (presetGroupTitle) {
       document.getElementById('expense-modal-title').textContent = `Tambah Item: ${presetGroupTitle}`;
+      const submitBtn = document.querySelector('#expense-form button[type="submit"]');
+      if (submitBtn) submitBtn.textContent = 'Simpan Item';
       populateGroupTitleOptions(presetGroupTitle, targetPhase);
       const groupSelect = document.getElementById('modal-exp-grouptitle');
       if (groupSelect) groupSelect.value = presetGroupTitle;
@@ -1559,6 +1608,8 @@
 
     editingExpenseId = expenseId;
     document.getElementById('expense-modal-title').textContent = 'Kemaskini Perbelanjaan';
+    const submitBtn = document.querySelector('#expense-form button[type="submit"]');
+    if (submitBtn) submitBtn.textContent = 'Kemaskini Perbelanjaan';
 
     const banner = document.getElementById('modal-group-preset-banner');
     if (banner) banner.style.display = 'none';
@@ -1631,7 +1682,8 @@
       }
     }
 
-    const groupKey = groupTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const existingItem = editingExpenseId ? appData.expenses.find(e => e.id === editingExpenseId) : null;
+    const groupKey = getStandardGroupKey(groupTitle, existingItem);
 
     let targetExpenseId = editingExpenseId;
 
@@ -1652,7 +1704,7 @@
           status,
           notes
         };
-        showToast(`Item '${desc}' berjaya dikemaskini!`, 'success');
+        showToast(`Item '${desc}' berjaya dikemaskini! ✅`, 'success');
       }
     } else {
       targetExpenseId = 'exp_' + Date.now();
@@ -1671,7 +1723,7 @@
         notes,
         hasReceipt: false
       });
-      showToast(`Item baharu '${desc}' berjaya ditambah ke ${groupTitle}! 🎉`, 'success');
+      showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian "${groupTitle}".`, 'success');
     }
 
     // Check if a receipt file was uploaded in modal
@@ -1704,6 +1756,7 @@
     }
 
     lastActiveGroupKey = groupKey;
+    expandedGroupCardIds.add('card-' + groupKey);
 
     saveData();
     closeModal('expense-modal');
@@ -1715,7 +1768,7 @@
       renderExpensesView();
     }
 
-    // Ensure the targeted group card is expanded and smoothly scrolled to
+    // Pastikan kad seksyen tersebut kekal terbuka dan scroll dengan lancar ke item berkenaan
     setTimeout(() => {
       const cardEl = document.getElementById(`card-${groupKey}`);
       if (cardEl) {
@@ -1724,9 +1777,20 @@
           const icon = cardEl.querySelector('.group-collapse-icon');
           if (icon) icon.textContent = '▼';
         }
-        cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        const rowEl = cardEl.querySelector(`tr[data-id="${targetExpenseId}"]`);
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          rowEl.style.transition = 'background-color 0.4s ease';
+          rowEl.style.backgroundColor = '#ecfdf5';
+          setTimeout(() => {
+            rowEl.style.backgroundColor = '';
+          }, 1500);
+        } else {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       }
-    }, 100);
+    }, 80);
   }
 
   async function deleteExpense(expenseId) {
@@ -1734,6 +1798,10 @@
     if (!item) return;
 
     if (confirm(`Adakah anda pasti ingin memadam rekod "${item.description}"?`)) {
+      const groupKey = item.groupKey || getStandardGroupKey(item.groupTitle || '', item);
+      lastActiveGroupKey = groupKey;
+      expandedGroupCardIds.add('card-' + groupKey);
+
       appData.expenses = appData.expenses.filter(e => e.id !== expenseId);
       if (item.hasReceipt) {
         await dbDeleteReceipt(expenseId);
