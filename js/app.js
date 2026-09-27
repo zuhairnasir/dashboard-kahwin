@@ -2207,14 +2207,13 @@
       saveData();
       closeModal('expense-modal');
 
-      // Stay on current phase tab or switch to the phase of the added item
-      if (currentTab !== 'all' && currentTab !== phase) {
-        switchTab(phase, groupKey);
-      } else {
-        renderExpensesView();
-      }
+      // KEKAL BERADA DI HALAMAN / TAB SEMASA: Jangan sekali-kali lompat ke pages/tab lain
+      renderExpensesView();
+      renderPhaseBanners();
+      updateHeaderSummary();
+      renderMilestones();
 
-      // Pastikan kad seksyen tersebut kekal terbuka dan scroll dengan lancar ke item berkenaan
+      // Pastikan kad seksyen tersebut kekal terbuka dan skrin fokus tepat ke item berkenaan
       setTimeout(() => {
         const cardEl = document.getElementById(`card-${groupKey}`);
         if (cardEl) {
@@ -2223,20 +2222,38 @@
             const icon = cardEl.querySelector('.group-collapse-icon');
             if (icon) icon.textContent = '▼';
           }
-          
-          const rowEl = cardEl.querySelector(`tr[data-id="${targetExpenseId}"]`);
-          if (rowEl) {
-            rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            rowEl.style.transition = 'background-color 0.4s ease';
-            rowEl.style.backgroundColor = '#ecfdf5';
-            setTimeout(() => {
-              rowEl.style.backgroundColor = '';
-            }, 1500);
-          } else {
-            cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }
         }
-      }, 80);
+
+        let rowEl = document.querySelector(`tr[data-id="${targetExpenseId}"]`);
+        
+        // Jika item tidak dijumpai akibat penapis pihak/status yang aktif, laras semula penapis supaya item muncul
+        if (!rowEl && (activePihakFilter !== 'all' || activeCategoryFilter !== 'all' || expenseFilters.status !== 'all')) {
+          activePihakFilter = 'all';
+          activeCategoryFilter = 'all';
+          expenseFilters.status = 'all';
+          renderExpensesView();
+          rowEl = document.querySelector(`tr[data-id="${targetExpenseId}"]`);
+        }
+
+        if (rowEl) {
+          const rect = rowEl.getBoundingClientRect();
+          const absoluteTop = window.scrollY + rect.top;
+          const targetTop = Math.max(0, absoluteTop - (window.innerHeight / 2) + (rect.height / 2));
+          window.scrollTo({ top: targetTop, behavior: 'smooth' });
+
+          rowEl.style.transition = 'background-color 0.4s ease, box-shadow 0.4s ease';
+          rowEl.style.backgroundColor = 'rgba(217, 119, 6, 0.22)';
+          rowEl.style.outline = '2px solid rgba(217, 119, 6, 0.55)';
+          setTimeout(() => {
+            rowEl.style.backgroundColor = '';
+            rowEl.style.outline = '';
+          }, 2500);
+        } else if (cardEl) {
+          const cRect = cardEl.getBoundingClientRect();
+          const cTop = window.scrollY + cRect.top - 80;
+          window.scrollTo({ top: Math.max(0, cTop), behavior: 'smooth' });
+        }
+      }, 70);
     } finally {
       editingExpenseId = null;
       isSavingExpense = false;
@@ -2257,9 +2274,14 @@
       if (item.hasReceipt) {
         await dbDeleteReceipt(expenseId);
       }
+      const currentScrollY = window.scrollY;
       saveData();
       await syncReceiptFlags();
       renderExpensesView();
+      renderPhaseBanners();
+      updateHeaderSummary();
+      renderMilestones();
+      window.scrollTo({ top: currentScrollY, behavior: 'instant' });
       showToast(`Item "${item.description}" telah dipadam.`, 'info', true);
     }
   }
@@ -2352,9 +2374,22 @@
         showToast(`Tetamu baharu '${nama}' berjaya ditambah! 💌`, 'success', true);
       }
 
+      const targetGuestId = editingGuestId || ('gst_' + Date.now());
       saveData();
       closeModal('guest-modal');
       renderGuestTable();
+
+      setTimeout(() => {
+        const row = document.querySelector(`tr[data-guest-id="${targetGuestId}"]`);
+        if (row) {
+          const rect = row.getBoundingClientRect();
+          const absoluteTop = window.scrollY + rect.top;
+          window.scrollTo({ top: Math.max(0, absoluteTop - (window.innerHeight / 2) + (rect.height / 2)), behavior: 'smooth' });
+          row.style.transition = 'background-color 0.4s ease';
+          row.style.backgroundColor = 'rgba(217, 119, 6, 0.22)';
+          setTimeout(() => { row.style.backgroundColor = ''; }, 2000);
+        }
+      }, 70);
     } finally {
       editingGuestId = null;
       isSavingGuest = false;
