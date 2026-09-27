@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Perkahwinan: Aisyah & Zuhair ("Road to Halal")</title>
   <meta name="description" content="Aplikasi pengurusan perbelanjaan dan senarai kehadiran tetamu perkahwinan Aisyah & Zuhair.">
-  <link rel="stylesheet" href="css/style.css?v=2.8">
+  <link rel="stylesheet" href="css/style.css?v=2.9">
   <!-- Chart.js CDN for interactive visual analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -83,9 +83,6 @@
         </button>
         <button class="nav-tab-btn" data-tab="nikah">
           <span class="tab-icon">💍</span> Akad Nikah
-        </button>
-        <button class="nav-tab-btn" data-tab="sanding">
-          <span class="tab-icon">👑</span> Sanding (P)
         </button>
         <button class="nav-tab-btn" data-tab="bertandang">
           <span class="tab-icon">🏛️</span> Bertandang (L)
@@ -282,41 +279,7 @@
       <div id="nikah-content-area"></div>
     </div>
 
-    <!-- TAB 4: Sanding Perempuan -->
-    <div class="tab-pane" id="tab-pane-sanding">
-      <div class="phase-banner">
-        <div class="phase-banner-info">
-          <h2 id="sanding-banner-title">Sanding (Belah Perempuan)</h2>
-          <div class="phase-banner-tags">
-            <span class="tag-pill" id="sanding-banner-date">📅 30 Mei 2027</span>
-            <span class="tag-pill" id="sanding-banner-theme">🎨 Tema: Cream + Gold</span>
-            <span class="tag-pill" id="sanding-banner-venue">📍 Kediaman Pengantin Perempuan</span>
-            <span class="tag-pill" style="background:#fce7f3; color:#be185d; font-weight:700;">Resepsi Pihak Perempuan</span>
-          </div>
-        </div>
-        <div class="phase-stats-strip">
-          <div class="phase-stat-item">
-            <div class="phase-stat-label">Anggaran</div>
-            <div class="phase-stat-val" id="sanding-stat-budget">RM 0.00</div>
-          </div>
-          <div class="phase-stat-item">
-            <div class="phase-stat-label">Sebenar</div>
-            <div class="phase-stat-val" id="sanding-stat-actual" style="color:var(--primary);">RM 0.00</div>
-          </div>
-          <div class="phase-stat-item">
-            <div class="phase-stat-label">Sudah Bayar</div>
-            <div class="phase-stat-val" id="sanding-stat-paid" style="color:var(--emerald-dark);">RM 0.00</div>
-          </div>
-          <div class="phase-stat-item">
-            <div class="phase-stat-label">Baki Belum Bayar</div>
-            <div class="phase-stat-val" id="sanding-stat-balance" style="color:#2563eb;">RM 0.00</div>
-          </div>
-        </div>
-      </div>
-      <div id="sanding-content-area"></div>
-    </div>
-
-    <!-- TAB 5: Bertandang Lelaki -->
+    <!-- TAB 4: Bertandang Lelaki -->
     <div class="tab-pane" id="tab-pane-bertandang">
       <div class="phase-banner">
         <div class="phase-banner-info">
@@ -527,7 +490,6 @@
               <select class="form-control" id="modal-exp-phase" required onchange="window.dashboardApp.handleModalPhaseChange(this.value)">
                 <option value="tunang">🌸 Pertunangan (5 Sept 2026)</option>
                 <option value="nikah">💍 Akad Nikah (27 Mac 2027)</option>
-                <option value="sanding">👑 Sanding Belah Perempuan (30 Mei 2027)</option>
                 <option value="bertandang">🏛️ Bertandang Belah Lelaki (30 Mei 2027)</option>
               </select>
             </div>
@@ -640,7 +602,7 @@
               <label class="form-label" for="modal-gst-side">Majlis Pihak *</label>
               <select class="form-control" id="modal-gst-side" required>
                 <option value="Lelaki">Majlis Lelaki (Bertandang / Nikah)</option>
-                <option value="Perempuan">Majlis Perempuan (Sanding / Nikah)</option>
+                <option value="Perempuan">Majlis Perempuan (Akad Nikah)</option>
               </select>
             </div>
           </div>
@@ -773,7 +735,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="data/weddingData.js?v=2.8"></script>
-  <script src="js/app.js?v=2.8"></script>
+  <script src="data/weddingData.js?v=2.9"></script>
+  <script src="js/app.js?v=2.9"></script>
 </body>
 </html>

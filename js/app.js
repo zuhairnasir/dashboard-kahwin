@@ -15,7 +15,7 @@
   const STORE_NAME = 'receipts';
 
   let appData = loadInitialData();
-  let currentTab = 'all'; // 'all', 'tunang', 'nikah', 'sanding', 'bertandang', 'guests', 'receipts', 'charts'
+  let currentTab = 'all'; // 'all', 'tunang', 'nikah', 'bertandang', 'guests', 'receipts', 'charts'
 
   // View & Filter states
   let viewMode = 'grouped'; // 'grouped' (Kad Kelompok Kategori) atau 'table' (Jadual Penuh)
@@ -253,6 +253,10 @@
       }
     }
 
+    if (data && Array.isArray(data.phases)) {
+      data.phases = data.phases.filter(p => p.id !== 'sanding');
+    }
+
     if (data && Array.isArray(data.expenses)) {
       data.expenses = deduplicateExpenses(data.expenses);
     }
@@ -464,19 +468,6 @@
       "🎵 Hiburan & PA System",
       "💌 Jemputan & Doorgift",
       "🚙 Penginapan & Logistik",
-      "✨ Lain-lain Persiapan"
-    ],
-    sanding: [
-      "👰 Part Pengantin Perempuan",
-      "🤵 Part Pengantin Lelaki",
-      "🏰 Lokasi, Dewan & Khemah",
-      "🍽️ Jamuan & Katering",
-      "📸 Fotografi & Media",
-      "🎵 Hiburan & PA System",
-      "💌 Jemputan & Doorgift",
-      "🚙 Penginapan & Logistik",
-      "🎁 Barang Hantaran (Lelaki Sediakan)",
-      "🎁 Barang Hantaran (Perempuan Sediakan)",
       "✨ Lain-lain Persiapan"
     ],
     bertandang: [
@@ -704,8 +695,7 @@
     const milestones = [
       { id: 'tunang', icon: '🌸', title: '1. Pertunangan', date: '5 Sept 2026', venue: 'Rumah Pengantin Perempuan' },
       { id: 'nikah', icon: '💍', title: '2. Akad Nikah', date: '27 Mac 2027', venue: 'Masjid / Dewan Nikah' },
-      { id: 'sanding', icon: '👑', title: '3. Sanding Perempuan', date: '30 Mei 2027', venue: 'Rumah Pengantin Perempuan' },
-      { id: 'bertandang', icon: '🏛️', title: '4. Bertandang Lelaki', date: '30 Mei 2027', venue: 'Dewan Majlis (800 Pax)' }
+      { id: 'bertandang', icon: '🏛️', title: '3. Bertandang Lelaki', date: '30 Mei 2027', venue: 'Dewan Majlis (800 Pax)' }
     ];
 
     let stepsHtml = '';
@@ -745,7 +735,7 @@
 
   // --- Phase Banners Update ---
   function renderPhaseBanners() {
-    const phases = ['tunang', 'nikah', 'sanding', 'bertandang'];
+    const phases = ['tunang', 'nikah', 'bertandang'];
     phases.forEach(pId => {
       const items = appData.expenses.filter(e => e.phase === pId);
       const budget = items.reduce((acc, c) => acc + (Number(c.budget) || 0), 0);
@@ -767,6 +757,7 @@
 
   // --- Tab Navigation ---
   function switchTab(tabId, targetGroupKey = null) {
+    if (tabId === 'sanding') tabId = 'nikah';
     if (currentTab !== tabId) {
       expandedGroupCardIds.clear();
     }
@@ -1964,9 +1955,9 @@
     const phaseSelect = document.getElementById('modal-exp-phase');
     let targetPhase = 'tunang';
     if (presetPhase && presetPhase !== 'all') {
-      targetPhase = presetPhase;
+      targetPhase = (presetPhase === 'sanding') ? 'nikah' : presetPhase;
     } else if (currentTab !== 'all' && currentTab !== 'guests' && currentTab !== 'receipts' && currentTab !== 'charts') {
-      targetPhase = currentTab;
+      targetPhase = (currentTab === 'sanding') ? 'nikah' : currentTab;
     }
     phaseSelect.value = targetPhase;
 

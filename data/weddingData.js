@@ -25,15 +25,6 @@ const INITIAL_WEDDING_DATA = {
       "venue": "Masjid / Dewan Nikah"
     },
     {
-      "id": "sanding",
-      "title": "Sanding (Belah Perempuan)",
-      "eventDate": "2027-05-30",
-      "dateDisplay": "30 Mei 2027",
-      "theme": "Cream + Gold",
-      "tag": "Resepsi Belah Perempuan",
-      "venue": "Kediaman Pengantin Perempuan"
-    },
-    {
       "id": "bertandang",
       "title": "Bertandang (Belah Lelaki)",
       "eventDate": "2027-05-30",
