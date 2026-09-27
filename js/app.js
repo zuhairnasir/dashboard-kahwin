@@ -230,6 +230,29 @@
       }
     }
 
+    // Auto-migration: Masukkan semua item perbelanjaan 'sanding' (Sanding Belah Perempuan) ke dalam 'nikah' (Akad Nikah)
+    if (data && Array.isArray(data.expenses)) {
+      let migratedSanding = false;
+      const nikahItems = data.expenses.filter(e => e.phase === 'nikah');
+
+      data.expenses.forEach(item => {
+        if (item.phase === 'sanding') {
+          item.phase = 'nikah';
+          item.phaseTitle = 'Akad Nikah';
+          if (!item.notes && nikahItems.some(n => n.description === item.description && n.groupTitle === item.groupTitle)) {
+            item.notes = 'Untuk Majlis Sanding';
+          }
+          migratedSanding = true;
+        }
+      });
+
+      if (migratedSanding) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (err) {}
+      }
+    }
+
     if (data && Array.isArray(data.expenses)) {
       data.expenses = deduplicateExpenses(data.expenses);
     }
@@ -438,9 +461,9 @@
       "🏰 Lokasi, Dewan & Khemah",
       "🍽️ Jamuan & Katering",
       "📸 Fotografi & Media",
+      "🎵 Hiburan & PA System",
       "💌 Jemputan & Doorgift",
       "🚙 Penginapan & Logistik",
-      "🎵 Hiburan & PA System",
       "✨ Lain-lain Persiapan"
     ],
     sanding: [
