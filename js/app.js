@@ -273,6 +273,9 @@
       if (currentTab === 'charts') {
         renderCharts();
       }
+      if (typeof triggerGistPushDebounced === 'function') {
+        triggerGistPushDebounced();
+      }
     } catch (e) {
       console.error('Gagal menyimpan ke LocalStorage:', e);
       showToast('Amaran: Gagal menyimpan data ke pelayar!', 'error');
@@ -2654,6 +2657,325 @@
     }
   }
 
+  // --- GitHub Gist Cloud Sync System ---
+  const GIST_CONFIG_KEY = 'wedding_gist_sync_config';
+  let gistSyncDebounceTimer = null;
+  let isGistSyncing = false;
+
+  function getGistConfig() {
+    try {
+      const saved = localStorage.getItem(GIST_CONFIG_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { token: '', gistId: '', autoSync: true, lastSynced: null };
+  }
+
+  function saveGistConfig(cfg) {
+    try {
+      localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(cfg));
+    } catch (e) {}
+    updateGistUIStatus();
+  }
+
+  function formatTimeAgo(isoString) {
+    if (!isoString) return 'Belum pernah';
+    try {
+      const diffMs = Date.now() - new Date(isoString).getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return 'Baru tadi';
+      if (diffMin < 60) return `${diffMin} min lepas`;
+      const diffHrs = Math.floor(diffMin / 60);
+      if (diffHrs < 24) return `${diffHrs} jam lepas`;
+      return new Date(isoString).toLocaleDateString('ms-MY');
+    } catch (e) {
+      return 'Baru tadi';
+    }
+  }
+
+  function updateGistUIStatus(status = 'idle') {
+    const cfg = getGistConfig();
+    const isConnected = !!(cfg.token && cfg.gistId);
+
+    const iconEl = document.getElementById('gist-sync-icon');
+    const labelEl = document.getElementById('gist-sync-label');
+
+    if (iconEl && labelEl) {
+      if (status === 'syncing') {
+        iconEl.textContent = '🔄';
+        labelEl.textContent = 'Menyimpan...';
+      } else if (status === 'error') {
+        iconEl.textContent = '⚠️';
+        labelEl.textContent = 'Ralat Segerak';
+      } else if (isConnected) {
+        iconEl.textContent = '🟢';
+        labelEl.textContent = 'Segerak: Aktif';
+      } else {
+        iconEl.textContent = '☁️';
+        labelEl.textContent = 'Segerak Gist';
+      }
+    }
+
+    const statusCard = document.getElementById('gist-status-card');
+    const connectedIdEl = document.getElementById('gist-connected-id');
+    const lastSyncedBadge = document.getElementById('gist-last-synced-badge');
+    const mobileBox = document.getElementById('gist-mobile-link-box');
+    const shareLinkInput = document.getElementById('gist-share-link');
+    const disconnectBtn = document.getElementById('btn-gist-disconnect');
+
+    if (statusCard && isConnected) {
+      statusCard.style.display = 'block';
+      if (connectedIdEl) connectedIdEl.textContent = cfg.gistId;
+      if (lastSyncedBadge) lastSyncedBadge.textContent = formatTimeAgo(cfg.lastSynced);
+      if (mobileBox) {
+        mobileBox.style.display = 'block';
+        if (shareLinkInput) {
+          const shareUrl = `${window.location.origin}${window.location.pathname}#sync=${encodeURIComponent(cfg.token + ':::' + cfg.gistId)}`;
+          shareLinkInput.value = shareUrl;
+        }
+      }
+      if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
+    } else {
+      if (statusCard) statusCard.style.display = 'none';
+      if (mobileBox) mobileBox.style.display = 'none';
+      if (disconnectBtn) disconnectBtn.style.display = 'none';
+    }
+  }
+
+  function openGistSyncModal() {
+    const cfg = getGistConfig();
+    const tokenInput = document.getElementById('gist-token-input');
+    const idInput = document.getElementById('gist-id-input');
+    const autoSyncToggle = document.getElementById('gist-autosync-toggle');
+
+    if (tokenInput) tokenInput.value = cfg.token || '';
+    if (idInput) idInput.value = cfg.gistId || '';
+    if (autoSyncToggle) autoSyncToggle.checked = cfg.autoSync !== false;
+
+    updateGistUIStatus();
+    openModal('gist-sync-modal');
+  }
+
+  async function createNewGist(token, payloadData) {
+    const body = {
+      description: 'Dashboard Perkahwinan Aisyah & Zuhair Data',
+      public: false,
+      files: {
+        'wedding_data.json': {
+          content: JSON.stringify(payloadData, null, 2)
+        }
+      }
+    };
+
+    const res = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `token ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || `Ralat GitHub API ${res.status}`);
+    }
+
+    const json = await res.json();
+    return json.id;
+  }
+
+  async function saveGistSettings() {
+    const token = document.getElementById('gist-token-input')?.value.trim();
+    let gistId = document.getElementById('gist-id-input')?.value.trim();
+    const autoSync = document.getElementById('gist-autosync-toggle')?.checked ?? true;
+
+    if (!token) {
+      alert('Sila masukkan GitHub Personal Access Token (PAT). Anda boleh klik pautan di atas untuk mencipta token secara percuma di GitHub.');
+      return;
+    }
+
+    const connectBtn = document.getElementById('btn-gist-connect');
+    if (connectBtn) {
+      connectBtn.disabled = true;
+      connectBtn.textContent = '⏳ Menyambung...';
+    }
+
+    try {
+      if (!gistId) {
+        showToast('Sedang mencipta Gist baharu di akaun GitHub anda...', 'info');
+        gistId = await createNewGist(token, appData);
+        if (document.getElementById('gist-id-input')) {
+          document.getElementById('gist-id-input').value = gistId;
+        }
+      }
+
+      const cfg = {
+        token,
+        gistId,
+        autoSync,
+        lastSynced: new Date().toISOString()
+      };
+      saveGistConfig(cfg);
+
+      // Push initial state to Gist to verify and ensure it matches
+      await pushDataToGist(true);
+
+      showToast('🎉 Berjaya disambungkan ke GitHub Gist! Segerak awan kini aktif.', 'success');
+      closeModal('gist-sync-modal');
+    } catch (err) {
+      alert('Gagal menyambung ke GitHub Gist: ' + err.message + '\n\nSila pastikan Token anda betul dan mempunyai kebenaran "gist".');
+    } finally {
+      if (connectBtn) {
+        connectBtn.disabled = false;
+        connectBtn.textContent = '🚀 Simpan & Sambung';
+      }
+    }
+  }
+
+  function copyGistShareLink() {
+    const input = document.getElementById('gist-share-link');
+    if (!input || !input.value) return;
+    navigator.clipboard.writeText(input.value).then(() => {
+      showToast('📋 Pautan segerak handphone disalin! Hantar ke telefon anda (WhatsApp/Telegram).', 'success');
+    }).catch(() => {
+      input.select();
+      document.execCommand('copy');
+      showToast('📋 Pautan disalin!', 'success');
+    });
+  }
+
+  function disconnectGist() {
+    if (confirm('Adakah anda pasti ingin memutuskan sambungan Segerak Gist? Data sedia ada di peranti anda tidak akan dipadam.')) {
+      localStorage.removeItem(GIST_CONFIG_KEY);
+      updateGistUIStatus();
+      closeModal('gist-sync-modal');
+      showToast('Sambungan GitHub Gist telah diputuskan.', 'info');
+    }
+  }
+
+  function triggerGistPushDebounced() {
+    const cfg = getGistConfig();
+    if (!cfg.token || !cfg.gistId || !cfg.autoSync) return;
+    if (gistSyncDebounceTimer) clearTimeout(gistSyncDebounceTimer);
+    gistSyncDebounceTimer = setTimeout(() => {
+      pushDataToGist(false);
+    }, 1200);
+  }
+
+  async function pushDataToGist(immediate = false) {
+    const cfg = getGistConfig();
+    if (!cfg.token || !cfg.gistId) return;
+    if (isGistSyncing && !immediate) return;
+
+    isGistSyncing = true;
+    updateGistUIStatus('syncing');
+
+    try {
+      const payload = {
+        description: 'Dashboard Perkahwinan Aisyah & Zuhair Data',
+        files: {
+          'wedding_data.json': {
+            content: JSON.stringify(appData, null, 2)
+          }
+        }
+      };
+
+      const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+        method: 'PATCH',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `token ${cfg.token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Ralat GitHub ${res.status}`);
+      }
+
+      cfg.lastSynced = new Date().toISOString();
+      saveGistConfig(cfg);
+      updateGistUIStatus('idle');
+      showToast('☁️ Data telah disegerakkan ke GitHub Gist!', 'success');
+    } catch (err) {
+      console.warn('Gagal segerak ke Gist:', err);
+      updateGistUIStatus('error');
+    } finally {
+      isGistSyncing = false;
+    }
+  }
+
+  async function pullDataFromGist(notify = false) {
+    const cfg = getGistConfig();
+    if (!cfg.gistId) return;
+
+    isGistSyncing = true;
+    updateGistUIStatus('syncing');
+
+    try {
+      const headers = { 'Accept': 'application/vnd.github+json' };
+      if (cfg.token) {
+        headers['Authorization'] = `token ${cfg.token}`;
+      }
+
+      const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, { headers });
+      if (!res.ok) throw new Error(`Ralat GitHub ${res.status}`);
+
+      const data = await res.json();
+      const file = data.files && (data.files['wedding_data.json'] || Object.values(data.files)[0]);
+      if (file && file.content) {
+        const parsed = JSON.parse(file.content);
+        if (parsed && Array.isArray(parsed.expenses)) {
+          appData = parsed;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+          } catch (e) {}
+          renderMasterKPI();
+          renderMilestoneTracker();
+          renderPhaseBanners();
+          renderExpensesView();
+          renderGuestTable();
+          if (currentTab === 'charts') renderCharts();
+
+          cfg.lastSynced = new Date().toISOString();
+          saveGistConfig(cfg);
+          updateGistUIStatus('idle');
+          if (notify) showToast('☁️ Data terkini berjaya dimuat turun daripada GitHub Gist!', 'success');
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal muat turun dari Gist:', err);
+      updateGistUIStatus('error');
+      if (notify) showToast('Gagal memuat turun data Gist: ' + err.message, 'error');
+    } finally {
+      isGistSyncing = false;
+    }
+  }
+
+  function checkUrlForGistConfig() {
+    const hash = window.location.hash;
+    if (hash && hash.includes('sync=')) {
+      try {
+        const param = hash.replace(/^#sync=/, '');
+        const decoded = decodeURIComponent(param);
+        const [token, gistId] = decoded.split(':::');
+        if (gistId) {
+          const cfg = { token: token || '', gistId, autoSync: true, lastSynced: null };
+          saveGistConfig(cfg);
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+          showToast('🎉 Berjaya menyambung ke GitHub Gist dari pautan!', 'success');
+          pullDataFromGist(true);
+        }
+      } catch (e) {
+        console.warn('Ralat membaca URL sync:', e);
+      }
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -2808,6 +3130,7 @@
   }
 
   async function init() {
+    checkUrlForGistConfig();
     renderMasterKPI();
     renderMilestoneTracker();
     renderPhaseBanners();
@@ -2815,9 +3138,16 @@
     renderGuestTable();
     initEvents();
     updateUndoButtonState();
+    updateGistUIStatus();
     await syncReceiptFlags();
 
     switchTab('all');
+
+    // Background pull from Gist if configured
+    const gistCfg = getGistConfig();
+    if (gistCfg && gistCfg.gistId) {
+      pullDataFromGist(false);
+    }
   }
 
   window.dashboardApp = {
@@ -2845,6 +3175,11 @@
     exportDataJSON,
     exportDataCSV,
     resetToDefault,
+    openGistSyncModal,
+    saveGistSettings,
+    copyGistShareLink,
+    disconnectGist,
+    pullDataFromGist,
     handleReceiptAction,
     triggerUploadReceipt,
     openReceiptModal,

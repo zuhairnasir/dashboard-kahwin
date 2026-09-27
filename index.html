@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Perkahwinan: Aisyah & Zuhair ("Road to Halal")</title>
   <meta name="description" content="Aplikasi pengurusan perbelanjaan dan senarai kehadiran tetamu perkahwinan Aisyah & Zuhair.">
-  <link rel="stylesheet" href="css/style.css?v=3.0">
+  <link rel="stylesheet" href="css/style.css?v=3.1">
   <!-- Chart.js CDN for interactive visual analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -32,6 +32,10 @@
         </button>
         <button class="btn btn-gold" onclick="window.dashboardApp.openAddGuestModal()">
           <span>✉️</span> Tambah Tetamu
+        </button>
+
+        <button class="btn btn-outline btn-sm" id="btn-gist-sync" title="Segerak Awan GitHub Gist" onclick="window.dashboardApp.openGistSyncModal()" style="display:inline-flex; align-items:center; gap:5px; font-weight:600;">
+          <span id="gist-sync-icon">☁️</span> <span id="gist-sync-label">Segerak Gist</span>
         </button>
 
         <div style="position:relative; display:inline-block;">
@@ -729,13 +733,93 @@
     </div>
   </div>
 
+  <!-- Modal: Segerak Awan (GitHub Gist) -->
+  <div class="modal-overlay" id="gist-sync-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">☁️ Tetapan Segerak Awan (GitHub Gist)</h3>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:0.85rem; color:#1e40af; line-height:1.5;">
+          <strong>💡 Bagaimana ini berfungsi?</strong><br>
+          Semua perbelanjaan dan senarai tetamu akan disegerakkan secara automatik ke akaun GitHub anda melalui <strong>GitHub Gist</strong> (percuma selamanya). Anda dan pasangan boleh melihat dan mengemaskini data terkini yang sama dari mana-mana telefon atau komputer!
+        </div>
+
+        <div id="gist-status-card" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:0.85rem; color:#166534;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong>✅ Sambungan Gist Aktif</strong>
+            <span id="gist-last-synced-badge" style="font-size:0.75rem; background:#dcfce7; padding:2px 8px; border-radius:12px; font-weight:700;">Baru tadi</span>
+          </div>
+          <div style="font-size:0.78rem; margin-top:6px; word-break:break-all;">
+            Gist ID: <code id="gist-connected-id" style="background:#dcfce7; padding:2px 5px; border-radius:4px; font-weight:700;"></code>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="gist-token-input" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>1. GitHub Personal Access Token (PAT) *</span>
+            <a href="https://github.com/settings/tokens/new?scopes=gist&description=Dashboard+Kahwin+Sync" target="_blank" rel="noopener noreferrer" style="color:#2563eb; text-decoration:underline; font-weight:600; font-size:0.8rem;">
+              🔑 Klik sini untuk cipta Token (1-klik)
+            </a>
+          </label>
+          <input type="password" class="form-control" id="gist-token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+            Hanya perlukan tanda satu kotak <strong>gist</strong> sahaja di GitHub. Token anda disimpan secara peribadi di peranti anda sahaja.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="gist-id-input">
+            2. Gist ID (Pilihan - Biarkan kosong untuk cipta secara automatik)
+          </label>
+          <input type="text" class="form-control" id="gist-id-input" placeholder="Dibiarkan kosong untuk cipta Gist baharu secara automatik">
+        </div>
+
+        <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="gist-autosync-toggle" checked style="width:18px; height:18px; cursor:pointer;">
+          <label for="gist-autosync-toggle" style="font-size:0.88rem; cursor:pointer; font-weight:600; margin:0;">
+            Segerak secara automatik setiap kali saya buat kemaskini / tambah item
+          </label>
+        </div>
+
+        <div id="gist-mobile-link-box" style="display:none; background:#faf5ff; border:1px solid #e9d5ff; border-radius:var(--radius-md); padding:12px; margin-top:16px;">
+          <label style="font-weight:700; color:#6b21a8; font-size:0.85rem; display:block; margin-bottom:4px;">
+            📱 Pautan Segerak Handphone (1-Klik):
+          </label>
+          <p style="font-size:0.78rem; color:#7e22ce; margin-bottom:8px;">
+            Hantar dan buka pautan ini di handphone anda sekali sahaja untuk terus bersambung secara automatik:
+          </p>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="gist-share-link" readonly class="form-control" style="font-size:0.75rem; background:white;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="window.dashboardApp.copyGistShareLink()" style="white-space:nowrap;">
+              📋 Salin Pautan
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between;">
+        <button type="button" class="btn btn-outline" id="btn-gist-disconnect" onclick="window.dashboardApp.disconnectGist()" style="display:none; color:#ef4444; border-color:#fca5a5;">
+          Putuskan Sambungan
+        </button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button type="button" class="btn btn-outline modal-cancel">Tutup</button>
+          <button type="button" class="btn btn-primary" id="btn-gist-connect" onclick="window.dashboardApp.saveGistSettings()">
+            🚀 Simpan & Sambung
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <input type="file" id="receipt-upload-input" accept="image/*,application/pdf" style="display:none;">
 
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="data/weddingData.js?v=3.0"></script>
-  <script src="js/app.js?v=3.0"></script>
+  <script src="data/weddingData.js?v=3.1"></script>
+  <script src="js/app.js?v=3.1"></script>
 </body>
 </html>
