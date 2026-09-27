@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Perkahwinan: Aisyah & Zuhair ("Road to Halal")</title>
   <meta name="description" content="Aplikasi pengurusan perbelanjaan dan senarai kehadiran tetamu perkahwinan Aisyah & Zuhair.">
-  <link rel="stylesheet" href="css/style.css?v=2.4">
+  <link rel="stylesheet" href="css/style.css?v=2.5">
   <!-- Chart.js CDN for interactive visual analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -55,6 +55,13 @@
           <span>📂</span> Import
         </button>
         <input type="file" id="import-file-input" accept=".json" style="display:none;">
+
+        <button class="btn btn-outline btn-sm" id="btn-undo-header" title="Undo / Buat asal perubahan (Cmd+Z / Ctrl+Z)" onclick="window.dashboardApp.undoLastAction()" disabled style="opacity:0.5; cursor:not-allowed;">
+          <span>↩️</span> Undo
+        </button>
+        <button class="btn btn-outline btn-sm" id="btn-redo-header" title="Redo / Ulang semula (Cmd+Shift+Z / Ctrl+Y)" onclick="window.dashboardApp.redoLastAction()" disabled style="opacity:0.5; display:none;">
+          <span>↪️</span> Redo
+        </button>
 
         <button class="btn btn-outline btn-sm" style="color:#ef4444;" title="Pulihkan kepada data awal Excel" onclick="window.dashboardApp.resetToDefault()">
           <span>🔄</span> Reset
@@ -766,7 +773,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Core Scripts -->
-  <script src="data/weddingData.js?v=2.4"></script>
-  <script src="js/app.js?v=2.4"></script>
+  <script src="data/weddingData.js?v=2.5"></script>
+  <script src="js/app.js?v=2.5"></script>
 </body>
 </html>

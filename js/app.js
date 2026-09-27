@@ -248,6 +248,153 @@
     }
   }
 
+  // --- Undo / Redo History System ---
+  const undoStack = [];
+  const redoStack = [];
+  const MAX_HISTORY = 40;
+
+  function pushHistoryState(actionName = 'Perubahan') {
+    try {
+      const snapshot = JSON.stringify(appData);
+      if (undoStack.length > 0 && undoStack[undoStack.length - 1].data === snapshot) {
+        return;
+      }
+      undoStack.push({
+        name: actionName,
+        data: snapshot,
+        tab: currentTab,
+        groupKey: lastActiveGroupKey
+      });
+      if (undoStack.length > MAX_HISTORY) {
+        undoStack.shift();
+      }
+      redoStack.length = 0;
+      updateUndoButtonState();
+    } catch (e) {
+      console.warn('Gagal rekod history:', e);
+    }
+  }
+
+  function undoLastAction() {
+    if (undoStack.length === 0) {
+      showToast('Tiada perubahan untuk di-undo.', 'info');
+      return;
+    }
+
+    const currentSnapshot = JSON.stringify(appData);
+    const lastState = undoStack.pop();
+
+    redoStack.push({
+      data: currentSnapshot,
+      tab: currentTab,
+      groupKey: lastActiveGroupKey
+    });
+
+    try {
+      appData = JSON.parse(lastState.data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+
+      if (lastState.groupKey) {
+        lastActiveGroupKey = lastState.groupKey;
+        expandedGroupCardIds.add('card-' + lastState.groupKey);
+      }
+
+      updateUndoButtonState();
+
+      const scrollY = window.scrollY;
+      renderMasterKPI();
+      renderMilestoneTracker();
+      renderPhaseBanners();
+      if (currentTab === 'guests') {
+        renderGuestTable();
+      } else if (currentTab === 'receipts') {
+        renderReceiptsGallery();
+      } else if (currentTab === 'charts') {
+        renderCharts();
+      } else {
+        renderExpensesView();
+      }
+      window.scrollTo({ top: scrollY, behavior: 'instant' });
+
+      showToast(`↩️ Undo: '${lastState.name || 'Perubahan'}' telah dibatalkan!`, 'info');
+    } catch (e) {
+      console.error('Error undo:', e);
+      showToast('Gagal melakukan undo.', 'error');
+    }
+  }
+
+  function redoLastAction() {
+    if (redoStack.length === 0) return;
+    const nextState = redoStack.pop();
+    const currentSnapshot = JSON.stringify(appData);
+    undoStack.push({
+      data: currentSnapshot,
+      tab: currentTab,
+      groupKey: lastActiveGroupKey
+    });
+
+    try {
+      appData = JSON.parse(nextState.data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+
+      if (nextState.groupKey) {
+        lastActiveGroupKey = nextState.groupKey;
+        expandedGroupCardIds.add('card-' + nextState.groupKey);
+      }
+
+      updateUndoButtonState();
+
+      const scrollY = window.scrollY;
+      renderMasterKPI();
+      renderMilestoneTracker();
+      renderPhaseBanners();
+      if (currentTab === 'guests') {
+        renderGuestTable();
+      } else if (currentTab === 'receipts') {
+        renderReceiptsGallery();
+      } else if (currentTab === 'charts') {
+        renderCharts();
+      } else {
+        renderExpensesView();
+      }
+      window.scrollTo({ top: scrollY, behavior: 'instant' });
+
+      showToast(`↪️ Redo berjaya digunakan!`, 'info');
+    } catch (e) {
+      console.error('Error redo:', e);
+    }
+  }
+
+  function updateUndoButtonState() {
+    const btnUndo = document.getElementById('btn-undo-header');
+    if (btnUndo) {
+      if (undoStack.length > 0) {
+        btnUndo.disabled = false;
+        btnUndo.style.opacity = '1';
+        btnUndo.style.cursor = 'pointer';
+        const lastAction = undoStack[undoStack.length - 1];
+        btnUndo.title = `Undo: ${lastAction.name || 'Tindakan terakhir'} (Cmd+Z / Ctrl+Z)`;
+      } else {
+        btnUndo.disabled = true;
+        btnUndo.style.opacity = '0.5';
+        btnUndo.style.cursor = 'not-allowed';
+        btnUndo.title = 'Tiada tindakan untuk di-undo (Cmd+Z / Ctrl+Z)';
+      }
+    }
+    const btnRedo = document.getElementById('btn-redo-header');
+    if (btnRedo) {
+      if (redoStack.length > 0) {
+        btnRedo.disabled = false;
+        btnRedo.style.opacity = '1';
+        btnRedo.style.display = 'inline-flex';
+      } else {
+        btnRedo.disabled = true;
+        btnRedo.style.opacity = '0.5';
+        btnRedo.style.display = 'none';
+      }
+    }
+  }
+
   // --- Helpers ---
   function formatRM(val) {
     const num = Number(val) || 0;
@@ -262,7 +409,7 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  function showToast(message, type = 'info') {
+  function showToast(message, type = 'info', allowUndo = false) {
     let container = document.getElementById('toast-container');
     if (!container) {
       container = document.createElement('div');
@@ -278,7 +425,12 @@
     if (type === 'error') icon = '⚠️';
     if (type === 'info') icon = '💡';
 
-    toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+    let undoBtnHtml = '';
+    if (allowUndo && undoStack.length > 0) {
+      undoBtnHtml = `<button type="button" class="toast-undo-btn" onclick="event.stopPropagation(); window.dashboardApp.undoLastAction(); this.closest('.toast').remove();">↩️ Undo</button>`;
+    }
+
+    toast.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><span>${icon}</span> <span>${message}</span></div> ${undoBtnHtml}`;
     container.appendChild(toast);
 
     setTimeout(() => {
@@ -286,7 +438,7 @@
       toast.style.transform = 'translateY(10px)';
       toast.style.transition = 'all 0.3s ease';
       setTimeout(() => toast.remove(), 300);
-    }, 3200);
+    }, allowUndo ? 4500 : 3200);
   }
 
   // --- Master KPI Calculations ---
@@ -1010,6 +1162,8 @@
     const item = appData.expenses.find(e => e.id === expenseId);
     if (!item) return;
 
+    pushHistoryState(item.status === 'Selesai' ? `Tukar status '${item.description}' ke Belum` : `Tanda selesai '${item.description}'`);
+
     const groupKey = item.groupKey || getStandardGroupKey(item.groupTitle || '', item);
     lastActiveGroupKey = groupKey;
     expandedGroupCardIds.add('card-' + groupKey);
@@ -1018,13 +1172,13 @@
 
     if (item.status === 'Selesai') {
       item.status = 'Belum';
-      showToast(`'${item.description}' ditukar ke Belum Bayar.`, 'info');
+      showToast(`'${item.description}' ditukar ke Belum Bayar.`, 'info', true);
     } else {
       item.status = 'Selesai';
       if ((!item.actual || item.actual === 0) && item.budget > 0) {
         item.actual = item.budget;
       }
-      showToast(`'${item.description}' ditandakan Selesai Bayar! ✅`, 'success');
+      showToast(`'${item.description}' ditandakan Selesai Bayar! ✅`, 'success', true);
     }
 
     saveData();
@@ -1095,6 +1249,9 @@
 
     const newTargetIdx = appData.expenses.findIndex(e => e.id === targetId);
     if (newTargetIdx === -1) return;
+
+    pushHistoryState(`Susun turutan '${movedItem.description}'`);
+
     const insertIdx = isBefore ? newTargetIdx : newTargetIdx + 1;
     appData.expenses.splice(insertIdx, 0, movedItem);
 
@@ -1107,7 +1264,7 @@
     renderExpensesView();
     window.scrollTo({ top: scrollY, behavior: 'instant' });
 
-    showToast(`✅ Susunan '${movedItem.description}' berjaya dikemaskini!`, 'success');
+    showToast(`✅ Susunan '${movedItem.description}' berjaya dikemaskini!`, 'success', true);
   }
 
   function handleRowDragEnd(e) {
@@ -1129,6 +1286,8 @@
     const currIdxInGroup = groupItems.findIndex(e => e.id === expenseId);
     if (currIdxInGroup === -1) return;
 
+    pushHistoryState(`Alih '${item.description}' ${direction === 'up' ? 'ke atas' : 'ke bawah'}`);
+
     if (direction === 'up' && currIdxInGroup > 0) {
       const neighbor = groupItems[currIdxInGroup - 1];
       swapExpenseItems(item.id, neighbor.id);
@@ -1147,7 +1306,7 @@
     const scrollY = window.scrollY;
     renderExpensesView();
     window.scrollTo({ top: scrollY, behavior: 'instant' });
-    showToast(`Turutan '${item.description}' dialih.`, 'info');
+    showToast(`Turutan '${item.description}' dialih.`, 'info', true);
   }
 
   function swapExpenseItems(idA, idB) {
@@ -1443,12 +1602,14 @@
     const g = appData.guests.find(item => item.id === guestId);
     if (!g) return;
 
+    pushHistoryState(`Tukar status kad '${g.nama}'`);
+
     if (g.kad && g.kad.toLowerCase().includes('sudah')) {
       g.kad = 'Belum Hantar';
-      showToast(`Kad untuk ${g.nama} ditukar ke Belum Hantar.`, 'info');
+      showToast(`Kad untuk ${g.nama} ditukar ke Belum Hantar.`, 'info', true);
     } else {
       g.kad = 'Sudah Hantar';
-      showToast(`Kad untuk ${g.nama} ditukar ke Sudah Hantar! ✉️`, 'success');
+      showToast(`Kad untuk ${g.nama} ditukar ke Sudah Hantar! ✉️`, 'success', true);
     }
 
     saveData();
@@ -1459,10 +1620,12 @@
     const g = appData.guests.find(item => item.id === guestId);
     if (!g) return;
 
+    pushHistoryState(`Tukar kehadiran '${g.nama}' ke ${newStatus}`);
+
     g.attendance = newStatus;
     saveData();
     renderGuestTable();
-    showToast(`Status kehadiran ${g.nama} dikemaskini: ${newStatus}`, 'success');
+    showToast(`Status kehadiran ${g.nama} dikemaskini: ${newStatus}`, 'success', true);
   }
 
   // --- Guests Table Rendering ---
@@ -1836,6 +1999,7 @@
     let targetExpenseId = editingExpenseId;
 
     if (editingExpenseId) {
+      pushHistoryState(`Kemaskini '${desc}'`);
       const idx = appData.expenses.findIndex(e => e.id === editingExpenseId);
       if (idx !== -1) {
         appData.expenses[idx] = {
@@ -1852,9 +2016,10 @@
           status,
           notes
         };
-        showToast(`Item '${desc}' berjaya dikemaskini! ✅`, 'success');
+        showToast(`Item '${desc}' berjaya dikemaskini! ✅`, 'success', true);
       }
     } else {
+      pushHistoryState(`Tambah '${desc}'`);
       targetExpenseId = 'exp_' + Date.now();
       appData.expenses.unshift({
         id: targetExpenseId,
@@ -1871,7 +2036,7 @@
         notes,
         hasReceipt: false
       });
-      showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian "${groupTitle}".`, 'success');
+      showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian "${groupTitle}".`, 'success', true);
     }
 
     // Check if a receipt file was uploaded in modal
@@ -1946,6 +2111,7 @@
     if (!item) return;
 
     if (confirm(`Adakah anda pasti ingin memadam rekod "${item.description}"?`)) {
+      pushHistoryState(`Padam '${item.description}'`);
       const groupKey = item.groupKey || getStandardGroupKey(item.groupTitle || '', item);
       lastActiveGroupKey = groupKey;
       expandedGroupCardIds.add('card-' + groupKey);
@@ -1957,7 +2123,7 @@
       saveData();
       await syncReceiptFlags();
       renderExpensesView();
-      showToast(`Item "${item.description}" telah dipadam.`, 'info');
+      showToast(`Item "${item.description}" telah dipadam.`, 'info', true);
     }
   }
 
@@ -2012,6 +2178,7 @@
     const notes = document.getElementById('modal-gst-notes').value.trim();
 
     if (editingGuestId) {
+      pushHistoryState(`Kemaskini maklumat tetamu '${nama}'`);
       const idx = appData.guests.findIndex(g => g.id === editingGuestId);
       if (idx !== -1) {
         appData.guests[idx] = {
@@ -2024,9 +2191,10 @@
           attendance,
           notes
         };
-        showToast(`Maklumat ${nama} berjaya dikemaskini!`, 'success');
+        showToast(`Maklumat ${nama} berjaya dikemaskini!`, 'success', true);
       }
     } else {
+      pushHistoryState(`Tambah tetamu '${nama}'`);
       const newId = 'gst_' + Date.now();
       appData.guests.unshift({
         id: newId,
@@ -2039,7 +2207,7 @@
         attendance,
         notes
       });
-      showToast(`Tetamu baharu '${nama}' berjaya ditambah! 💌`, 'success');
+      showToast(`Tetamu baharu '${nama}' berjaya ditambah! 💌`, 'success', true);
     }
 
     saveData();
@@ -2052,10 +2220,11 @@
     if (!g) return;
 
     if (confirm(`Adakah anda pasti ingin memadam tetamu "${g.nama}"?`)) {
+      pushHistoryState(`Padam tetamu '${g.nama}'`);
       appData.guests = appData.guests.filter(item => item.id !== guestId);
       saveData();
       renderGuestTable();
-      showToast(`Tetamu "${g.nama}" telah dipadam.`, 'info');
+      showToast(`Tetamu "${g.nama}" telah dipadam.`, 'info', true);
     }
   }
 
@@ -2279,10 +2448,11 @@
       try {
         const imported = JSON.parse(event.target.result);
         if (imported.expenses && imported.guests) {
+          pushHistoryState('Import data sandaran');
           appData = imported;
           saveData();
           syncReceiptFlags();
-          showToast('Data sandaran berjaya dimuat naik & dipulihkan! ✨', 'success');
+          showToast('Data sandaran berjaya dimuat naik & dipulihkan! ✨', 'success', true);
         } else {
           alert('Format fail JSON tidak sah. Sila pastikan fail mengandungi data perbelanjaan dan tetamu.');
         }
@@ -2295,10 +2465,11 @@
 
   function resetToDefault() {
     if (confirm('Adakah anda pasti ingin memulihkan semua data kembali ke data asal daripada fail Excel? Sebarang pertambahan data baru yang belum dibackup akan dipadam.')) {
+      pushHistoryState('Pulihkan ke data asal');
       appData = JSON.parse(JSON.stringify(INITIAL_WEDDING_DATA));
       saveData();
       syncReceiptFlags();
-      showToast('Data telah berjaya dipulihkan kepada data asal Excel! 🔄', 'success');
+      showToast('Data telah berjaya dipulihkan kepada data asal Excel! 🔄', 'success', true);
     }
   }
 
@@ -2421,6 +2592,38 @@
         }
       });
     }
+
+    // Undo / Redo Header Buttons
+    const btnUndo = document.getElementById('btn-undo-header');
+    if (btnUndo) {
+      btnUndo.addEventListener('click', () => {
+        undoLastAction();
+      });
+    }
+
+    const btnRedo = document.getElementById('btn-redo-header');
+    if (btnRedo) {
+      btnRedo.addEventListener('click', () => {
+        redoLastAction();
+      });
+    }
+
+    // Keyboard Shortcuts: Cmd+Z / Ctrl+Z (Undo) and Cmd+Shift+Z / Ctrl+Y (Redo)
+    window.addEventListener('keydown', (e) => {
+      const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+      if (!isInput && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          redoLastAction();
+        } else {
+          e.preventDefault();
+          undoLastAction();
+        }
+      } else if (!isInput && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redoLastAction();
+      }
+    });
   }
 
   async function init() {
@@ -2430,6 +2633,7 @@
     renderExpensesView();
     renderGuestTable();
     initEvents();
+    updateUndoButtonState();
     await syncReceiptFlags();
 
     switchTab('all');
@@ -2470,7 +2674,9 @@
     handleRowDragLeave,
     handleRowDrop,
     handleRowDragEnd,
-    moveExpenseItem
+    moveExpenseItem,
+    undoLastAction,
+    redoLastAction
   };
 
   document.addEventListener('DOMContentLoaded', init);
