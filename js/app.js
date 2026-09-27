@@ -230,6 +230,10 @@
       }
     }
 
+    if (data && Array.isArray(data.expenses)) {
+      data.expenses = deduplicateExpenses(data.expenses);
+    }
+
     return data;
   }
 
@@ -482,6 +486,32 @@
     });
 
     return idx !== -1 ? idx : 999;
+  }
+
+  function deduplicateExpenses(expenses) {
+    if (!Array.isArray(expenses)) return expenses;
+    const seen = new Set();
+    return expenses.filter(item => {
+      const desc = (item.description || '').trim().toLowerCase();
+      if (!desc) return true;
+      const key = [
+        item.phase || '',
+        item.groupTitle || '',
+        desc,
+        Number(item.budget) || 0,
+        Number(item.actual) || 0,
+        item.pihak || '',
+        item.status || '',
+        (item.notes || '').trim()
+      ].join('||');
+
+      if (seen.has(key)) {
+        console.warn('Membuang item pendua tidak sengaja:', item.description);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   function formatRM(val) {
@@ -760,6 +790,13 @@
     const containerId = isAll ? 'all-content-area' : `${activePhaseId}-content-area`;
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    // Bersihkan sebarang item pendua tidak sengaja (akibat klik/submit berulang)
+    const prevCount = appData.expenses.length;
+    appData.expenses = deduplicateExpenses(appData.expenses);
+    if (appData.expenses.length !== prevCount) {
+      saveData();
+    }
 
     // Simpan rekod kad yang sedang dibuka di skrin supaya tidak tertutup sendiri semasa render
     document.querySelectorAll('.group-card:not(.collapsed)').forEach(el => {
@@ -2002,55 +2039,79 @@
     openModal('expense-modal');
   }
 
+  let isSavingExpense = false;
+
   async function handleSaveExpense(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (isSavingExpense) return;
+    isSavingExpense = true;
 
-    const desc = document.getElementById('modal-exp-desc').value.trim();
-    if (!desc) {
-      alert('Sila masukkan perkara/penerangan perbelanjaan.');
-      return;
-    }
-
-    const phase = document.getElementById('modal-exp-phase').value;
-    const category = document.getElementById('modal-exp-category').value.trim() || 'Persiapan';
-    const budget = parseFloat(document.getElementById('modal-exp-budget').value) || 0;
-    const actual = parseFloat(document.getElementById('modal-exp-actual').value) || 0;
-    const pihak = document.getElementById('modal-exp-pihak').value;
-    const status = document.getElementById('modal-exp-status').value;
-    const notes = document.getElementById('modal-exp-notes').value.trim();
-
-    const phaseObj = appData.phases.find(p => p.id === phase);
-    const phaseTitle = phaseObj ? phaseObj.title : phase;
-
-    // Determine group title from form selection or fallback
-    const modalGroup = document.getElementById('modal-exp-grouptitle')?.value.trim();
-    let groupTitle = modalGroup || '✨ Lain-lain Persiapan';
-
-    if (!modalGroup) {
-      if (pihak === 'Lelaki') {
-        groupTitle = desc.toLowerCase().includes('hantaran') ? '🎁 Barang Hantaran (Lelaki Sediakan)' : '🤵 Part Pengantin Lelaki';
-      } else if (pihak === 'Perempuan') {
-        groupTitle = desc.toLowerCase().includes('hantaran') ? '🎁 Barang Hantaran (Perempuan Sediakan)' : '👰 Part Pengantin Perempuan';
-      } else {
-        if (category.toLowerCase().includes('katering') || desc.toLowerCase().includes('makan')) groupTitle = '🍽️ Jamuan & Katering';
-        else if (category.toLowerCase().includes('lokasi') || desc.toLowerCase().includes('dewan') || desc.toLowerCase().includes('kemah')) groupTitle = '🏰 Lokasi, Dewan & Khemah';
-        else if (category.toLowerCase().includes('foto') || desc.toLowerCase().includes('photo')) groupTitle = '📸 Fotografi & Media';
-        else if (category.toLowerCase().includes('kad') || desc.toLowerCase().includes('jemputan')) groupTitle = '💌 Jemputan & Doorgift';
-        else groupTitle = '🤝 Kos Bersama & Majlis';
+    try {
+      const desc = document.getElementById('modal-exp-desc').value.trim();
+      if (!desc) {
+        alert('Sila masukkan perkara/penerangan perbelanjaan.');
+        return;
       }
-    }
 
-    const existingItem = editingExpenseId ? appData.expenses.find(e => e.id === editingExpenseId) : null;
-    const groupKey = getStandardGroupKey(groupTitle, existingItem);
+      const phase = document.getElementById('modal-exp-phase').value;
+      const category = document.getElementById('modal-exp-category').value.trim() || 'Persiapan';
+      const budget = parseFloat(document.getElementById('modal-exp-budget').value) || 0;
+      const actual = parseFloat(document.getElementById('modal-exp-actual').value) || 0;
+      const pihak = document.getElementById('modal-exp-pihak').value;
+      const status = document.getElementById('modal-exp-status').value;
+      const notes = document.getElementById('modal-exp-notes').value.trim();
 
-    let targetExpenseId = editingExpenseId;
+      const phaseObj = appData.phases.find(p => p.id === phase);
+      const phaseTitle = phaseObj ? phaseObj.title : phase;
 
-    if (editingExpenseId) {
-      pushHistoryState(`Kemaskini '${desc}'`);
-      const idx = appData.expenses.findIndex(e => e.id === editingExpenseId);
-      if (idx !== -1) {
-        appData.expenses[idx] = {
-          ...appData.expenses[idx],
+      // Determine group title from form selection or fallback
+      const modalGroup = document.getElementById('modal-exp-grouptitle')?.value.trim();
+      let groupTitle = modalGroup || '✨ Lain-lain Persiapan';
+
+      if (!modalGroup) {
+        if (pihak === 'Lelaki') {
+          groupTitle = desc.toLowerCase().includes('hantaran') ? '🎁 Barang Hantaran (Lelaki Sediakan)' : '🤵 Part Pengantin Lelaki';
+        } else if (pihak === 'Perempuan') {
+          groupTitle = desc.toLowerCase().includes('hantaran') ? '🎁 Barang Hantaran (Perempuan Sediakan)' : '👰 Part Pengantin Perempuan';
+        } else {
+          if (category.toLowerCase().includes('katering') || desc.toLowerCase().includes('makan')) groupTitle = '🍽️ Jamuan & Katering';
+          else if (category.toLowerCase().includes('lokasi') || desc.toLowerCase().includes('dewan') || desc.toLowerCase().includes('kemah')) groupTitle = '🏰 Lokasi, Dewan & Khemah';
+          else if (category.toLowerCase().includes('foto') || desc.toLowerCase().includes('photo')) groupTitle = '📸 Fotografi & Media';
+          else if (category.toLowerCase().includes('kad') || desc.toLowerCase().includes('jemputan')) groupTitle = '💌 Jemputan & Doorgift';
+          else groupTitle = '🤝 Kos Bersama & Majlis';
+        }
+      }
+
+      const existingItem = editingExpenseId ? appData.expenses.find(e => e.id === editingExpenseId) : null;
+      const groupKey = getStandardGroupKey(groupTitle, existingItem);
+
+      let targetExpenseId = editingExpenseId;
+
+      if (editingExpenseId) {
+        pushHistoryState(`Kemaskini '${desc}'`);
+        const idx = appData.expenses.findIndex(e => e.id === editingExpenseId);
+        if (idx !== -1) {
+          appData.expenses[idx] = {
+            ...appData.expenses[idx],
+            phase,
+            phaseTitle,
+            category,
+            groupTitle,
+            groupKey,
+            description: desc,
+            budget,
+            actual,
+            pihak,
+            status,
+            notes
+          };
+          showToast(`Item '${desc}' berjaya dikemaskini! ✅`, 'success', true);
+        }
+      } else {
+        pushHistoryState(`Tambah '${desc}'`);
+        targetExpenseId = 'exp_' + Date.now();
+        const newExpenseItem = {
+          id: targetExpenseId,
           phase,
           phaseTitle,
           category,
@@ -2061,126 +2122,111 @@
           actual,
           pihak,
           status,
-          notes
+          notes,
+          hasReceipt: false
         };
-        showToast(`Item '${desc}' berjaya dikemaskini! ✅`, 'success', true);
-      }
-    } else {
-      pushHistoryState(`Tambah '${desc}'`);
-      targetExpenseId = 'exp_' + Date.now();
-      const newExpenseItem = {
-        id: targetExpenseId,
-        phase,
-        phaseTitle,
-        category,
-        groupTitle,
-        groupKey,
-        description: desc,
-        budget,
-        actual,
-        pihak,
-        status,
-        notes,
-        hasReceipt: false
-      };
 
-      // Cari item terakhir dalam kumpulan & fasa yang sama supaya item baharu berada di list bawah (bukan di atas)
-      let lastIndexInGroup = -1;
-      for (let i = appData.expenses.length - 1; i >= 0; i--) {
-        const item = appData.expenses[i];
-        if (item.phase === phase && (item.groupTitle === groupTitle || item.groupKey === groupKey)) {
-          lastIndexInGroup = i;
-          break;
-        }
-      }
-
-      if (lastIndexInGroup !== -1) {
-        // Masukkan item baru tepat di bawah item terakhir kumpulan tersebut
-        appData.expenses.splice(lastIndexInGroup + 1, 0, newExpenseItem);
-      } else {
-        // Jika kumpulan belum ada dalam fasa ini, masukkan di bahagian bawah senarai fasa atau di hujung array
-        let lastIndexInPhase = -1;
+        // Cari item terakhir dalam kumpulan & fasa yang sama supaya item baharu berada di list bawah (bukan di atas)
+        let lastIndexInGroup = -1;
         for (let i = appData.expenses.length - 1; i >= 0; i--) {
-          if (appData.expenses[i].phase === phase) {
-            lastIndexInPhase = i;
+          const item = appData.expenses[i];
+          if (item.phase === phase && (item.groupTitle === groupTitle || item.groupKey === groupKey)) {
+            lastIndexInGroup = i;
             break;
           }
         }
-        if (lastIndexInPhase !== -1) {
-          appData.expenses.splice(lastIndexInPhase + 1, 0, newExpenseItem);
+
+        if (lastIndexInGroup !== -1) {
+          // Masukkan item baru tepat di bawah item terakhir kumpulan tersebut
+          appData.expenses.splice(lastIndexInGroup + 1, 0, newExpenseItem);
         } else {
-          appData.expenses.push(newExpenseItem);
+          // Jika kumpulan belum ada dalam fasa ini, masukkan di bahagian bawah senarai fasa atau di hujung array
+          let lastIndexInPhase = -1;
+          for (let i = appData.expenses.length - 1; i >= 0; i--) {
+            if (appData.expenses[i].phase === phase) {
+              lastIndexInPhase = i;
+              break;
+            }
+          }
+          if (lastIndexInPhase !== -1) {
+            appData.expenses.splice(lastIndexInPhase + 1, 0, newExpenseItem);
+          } else {
+            appData.expenses.push(newExpenseItem);
+          }
         }
+
+        showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian bawah "${groupTitle}".`, 'success', true);
       }
 
-      showToast(`✅ Berjaya Disimpan! Item "${desc}" telah ditambah ke bahagian bawah "${groupTitle}".`, 'success', true);
-    }
-
-    // Check if a receipt file was uploaded in modal
-    const fileInput = document.getElementById('modal-exp-file');
-    if (fileInput && fileInput.files && fileInput.files[0]) {
-      const file = fileInput.files[0];
-      const reader = new FileReader();
-      reader.onload = async function(evt) {
-        const receiptRecord = {
-          id: targetExpenseId,
-          expenseId: targetExpenseId,
-          expenseDesc: desc,
-          phase: phaseTitle,
-          amount: actual > 0 ? actual : budget,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          fileData: evt.target.result,
-          notes: notes,
-          uploadDate: new Date().toLocaleString('ms-MY')
+      // Check if a receipt file was uploaded in modal
+      const fileInput = document.getElementById('modal-exp-file');
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = async function(evt) {
+          const receiptRecord = {
+            id: targetExpenseId,
+            expenseId: targetExpenseId,
+            expenseDesc: desc,
+            phase: phaseTitle,
+            amount: actual > 0 ? actual : budget,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            fileData: evt.target.result,
+            notes: notes,
+            uploadDate: new Date().toLocaleString('ms-MY')
+          };
+          await dbSaveReceipt(receiptRecord);
+          const expItem = appData.expenses.find(e => e.id === targetExpenseId);
+          if (expItem) expItem.hasReceipt = true;
+          saveData();
+          await syncReceiptFlags();
+          renderExpensesView();
         };
-        await dbSaveReceipt(receiptRecord);
-        const expItem = appData.expenses.find(e => e.id === targetExpenseId);
-        if (expItem) expItem.hasReceipt = true;
-        saveData();
-        await syncReceiptFlags();
-        renderExpensesView();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    lastActiveGroupKey = groupKey;
-    expandedGroupCardIds.add('card-' + groupKey);
-
-    saveData();
-    closeModal('expense-modal');
-
-    // Stay on current phase tab or switch to the phase of the added item
-    if (currentTab !== 'all' && currentTab !== phase) {
-      switchTab(phase, groupKey);
-    } else {
-      renderExpensesView();
-    }
-
-    // Pastikan kad seksyen tersebut kekal terbuka dan scroll dengan lancar ke item berkenaan
-    setTimeout(() => {
-      const cardEl = document.getElementById(`card-${groupKey}`);
-      if (cardEl) {
-        if (cardEl.classList.contains('collapsed')) {
-          cardEl.classList.remove('collapsed');
-          const icon = cardEl.querySelector('.group-collapse-icon');
-          if (icon) icon.textContent = '▼';
-        }
-        
-        const rowEl = cardEl.querySelector(`tr[data-id="${targetExpenseId}"]`);
-        if (rowEl) {
-          rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          rowEl.style.transition = 'background-color 0.4s ease';
-          rowEl.style.backgroundColor = '#ecfdf5';
-          setTimeout(() => {
-            rowEl.style.backgroundColor = '';
-          }, 1500);
-        } else {
-          cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+        reader.readAsDataURL(file);
       }
-    }, 80);
+
+      lastActiveGroupKey = groupKey;
+      expandedGroupCardIds.add('card-' + groupKey);
+
+      saveData();
+      closeModal('expense-modal');
+
+      // Stay on current phase tab or switch to the phase of the added item
+      if (currentTab !== 'all' && currentTab !== phase) {
+        switchTab(phase, groupKey);
+      } else {
+        renderExpensesView();
+      }
+
+      // Pastikan kad seksyen tersebut kekal terbuka dan scroll dengan lancar ke item berkenaan
+      setTimeout(() => {
+        const cardEl = document.getElementById(`card-${groupKey}`);
+        if (cardEl) {
+          if (cardEl.classList.contains('collapsed')) {
+            cardEl.classList.remove('collapsed');
+            const icon = cardEl.querySelector('.group-collapse-icon');
+            if (icon) icon.textContent = '▼';
+          }
+          
+          const rowEl = cardEl.querySelector(`tr[data-id="${targetExpenseId}"]`);
+          if (rowEl) {
+            rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            rowEl.style.transition = 'background-color 0.4s ease';
+            rowEl.style.backgroundColor = '#ecfdf5';
+            setTimeout(() => {
+              rowEl.style.backgroundColor = '';
+            }, 1500);
+          } else {
+            cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+      }, 80);
+    } finally {
+      editingExpenseId = null;
+      isSavingExpense = false;
+    }
   }
 
   async function deleteExpense(expenseId) {
@@ -2238,58 +2284,67 @@
     openModal('guest-modal');
   }
 
+  let isSavingGuest = false;
+
   function handleSaveGuest(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (isSavingGuest) return;
+    isSavingGuest = true;
 
-    const nama = document.getElementById('modal-gst-nama').value.trim();
-    if (!nama) {
-      alert('Sila masukkan nama tetamu / keluarga.');
-      return;
-    }
+    try {
+      const nama = document.getElementById('modal-gst-nama').value.trim();
+      if (!nama) {
+        alert('Sila masukkan nama tetamu / keluarga.');
+        return;
+      }
 
-    const pax = parseInt(document.getElementById('modal-gst-pax').value) || 1;
-    const side = document.getElementById('modal-gst-side').value;
-    const group = document.getElementById('modal-gst-group').value.trim() || 'Keluarga / Sahabat';
-    const kad = document.getElementById('modal-gst-kad').value;
-    const attendance = document.getElementById('modal-gst-attendance').value;
-    const notes = document.getElementById('modal-gst-notes').value.trim();
+      const pax = parseInt(document.getElementById('modal-gst-pax').value) || 1;
+      const side = document.getElementById('modal-gst-side').value;
+      const group = document.getElementById('modal-gst-group').value.trim() || 'Keluarga / Sahabat';
+      const kad = document.getElementById('modal-gst-kad').value;
+      const attendance = document.getElementById('modal-gst-attendance').value;
+      const notes = document.getElementById('modal-gst-notes').value.trim();
 
-    if (editingGuestId) {
-      pushHistoryState(`Kemaskini maklumat tetamu '${nama}'`);
-      const idx = appData.guests.findIndex(g => g.id === editingGuestId);
-      if (idx !== -1) {
-        appData.guests[idx] = {
-          ...appData.guests[idx],
+      if (editingGuestId) {
+        pushHistoryState(`Kemaskini maklumat tetamu '${nama}'`);
+        const idx = appData.guests.findIndex(g => g.id === editingGuestId);
+        if (idx !== -1) {
+          appData.guests[idx] = {
+            ...appData.guests[idx],
+            nama,
+            pax,
+            side,
+            group,
+            kad,
+            attendance,
+            notes
+          };
+          showToast(`Maklumat ${nama} berjaya dikemaskini!`, 'success', true);
+        }
+      } else {
+        pushHistoryState(`Tambah tetamu '${nama}'`);
+        const newId = 'gst_' + Date.now();
+        appData.guests.push({
+          id: newId,
           nama,
           pax,
+          paxRaw: String(pax),
           side,
           group,
           kad,
           attendance,
           notes
-        };
-        showToast(`Maklumat ${nama} berjaya dikemaskini!`, 'success', true);
+        });
+        showToast(`Tetamu baharu '${nama}' berjaya ditambah! 💌`, 'success', true);
       }
-    } else {
-      pushHistoryState(`Tambah tetamu '${nama}'`);
-      const newId = 'gst_' + Date.now();
-      appData.guests.push({
-        id: newId,
-        nama,
-        pax,
-        paxRaw: String(pax),
-        side,
-        group,
-        kad,
-        attendance,
-        notes
-      });
-      showToast(`Tetamu baharu '${nama}' berjaya ditambah! 💌`, 'success', true);
-    }
 
-    saveData();
-    closeModal('guest-modal');
-    renderGuestTable();
+      saveData();
+      closeModal('guest-modal');
+      renderGuestTable();
+    } finally {
+      editingGuestId = null;
+      isSavingGuest = false;
+    }
   }
 
   function deleteGuest(guestId) {
