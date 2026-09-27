@@ -1859,5 +1859,71 @@ tr.row-party-kongsi td:first-child {
   }
 }
 
+/* --- Drag & Drop Row Reordering --- */
+.draggable-row {
+  transition: background-color 0.15s ease, border 0.15s ease;
+}
+
+.draggable-row.is-dragging {
+  opacity: 0.45;
+  background-color: #f1f5f9 !important;
+}
+
+.draggable-row.drop-above {
+  border-top: 3px solid var(--primary) !important;
+}
+
+.draggable-row.drop-below {
+  border-bottom: 3px solid var(--primary) !important;
+}
+
+.drag-handle-cell {
+  width: 28px;
+  text-align: center;
+  padding: 6px 2px !important;
+  user-select: none;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, background-color 0.15s, transform 0.1s;
+}
+
+.drag-handle:hover {
+  color: var(--primary);
+  background-color: rgba(190, 24, 93, 0.08);
+  transform: scale(1.15);
+}
+
+.draggable-row:active .drag-handle {
+  cursor: grabbing;
+}
+
+.icon-move {
+  font-size: 0.68rem;
+  padding: 2px 4px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.icon-move:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
 
 

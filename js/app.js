@@ -52,6 +52,10 @@
   let pendingReceiptExpenseId = null;
   let activeViewingReceiptId = null;
 
+  // Drag and drop state
+  let draggedItemId = null;
+  let draggedGroupTitle = null;
+
   // Chart instances
   let charts = {};
 
@@ -750,8 +754,9 @@
                 <table class="data-table">
                   <thead>
                     <tr>
+                      <th style="width: 28px; text-align:center;" title="Tarik untuk susun semula turutan">↕</th>
                       <th style="width: 50px; text-align:center;">Selesai</th>
-                      <th style="width: 40px;">Bil</th>
+                      <th style="width: 35px;">Bil</th>
                       <th>Perkara & Catatan</th>
                       ${isAll ? '<th>Fasa Majlis</th>' : ''}
                       <th>Pihak Penanggung</th>
@@ -759,7 +764,7 @@
                       <th>Sebenar (RM)</th>
                       <th>Status Bayaran</th>
                       <th style="text-align:center;">Resit / Dokumen</th>
-                      <th style="text-align:center; width: 85px;">Tindakan</th>
+                      <th style="text-align:center; width: 110px;">Tindakan</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -787,8 +792,9 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th style="width: 28px; text-align:center;" title="Tarik untuk susun semula turutan">↕</th>
                   <th style="width: 50px; text-align:center;">Selesai</th>
-                  <th style="width: 40px;">Bil</th>
+                  <th style="width: 35px;">Bil</th>
                   <th>Perkara & Catatan</th>
                   <th>Bahagian / Kategori</th>
                   ${isAll ? '<th>Fasa Majlis</th>' : ''}
@@ -797,7 +803,7 @@
                   <th>Sebenar (RM)</th>
                   <th>Status Bayaran</th>
                   <th style="text-align:center;">Resit / Dokumen</th>
-                  <th style="text-align:center; width: 85px;">Tindakan</th>
+                  <th style="text-align:center; width: 110px;">Tindakan</th>
                 </tr>
               </thead>
               <tbody>
@@ -839,7 +845,19 @@
       }
 
       return `
-        <tr class="${rowClass}" data-id="${item.id}">
+        <tr class="${rowClass} draggable-row" 
+            data-id="${item.id}"
+            data-phase="${escapeHtml(item.phase || '')}"
+            data-grouptitle="${escapeHtml(item.groupTitle || '')}"
+            draggable="true"
+            ondragstart="window.dashboardApp.handleRowDragStart(event)"
+            ondragover="window.dashboardApp.handleRowDragOver(event)"
+            ondragleave="window.dashboardApp.handleRowDragLeave(event)"
+            ondrop="window.dashboardApp.handleRowDrop(event)"
+            ondragend="window.dashboardApp.handleRowDragEnd(event)">
+          <td class="drag-handle-cell" title="Tarik untuk susun semula turutan">
+            <span class="drag-handle">⠿</span>
+          </td>
           <td style="text-align:center;">
             <button class="tick-btn ${isPaid ? 'ticked' : ''}" 
                     title="${isPaid ? 'Tandakan belum bayar' : 'Tandakan selesai bayar'}" 
@@ -873,6 +891,8 @@
           </td>
           <td>
             <div class="action-btns">
+              <button class="icon-btn icon-move" title="Alih ke Atas" onclick="event.stopPropagation(); window.dashboardApp.moveExpenseItem('${item.id}', 'up')">▲</button>
+              <button class="icon-btn icon-move" title="Alih ke Bawah" onclick="event.stopPropagation(); window.dashboardApp.moveExpenseItem('${item.id}', 'down')">▼</button>
               <button class="icon-btn icon-edit" title="Kemaskini Item" onclick="window.dashboardApp.openEditExpenseModal('${item.id}')">
                 ✏️
               </button>
@@ -1010,6 +1030,134 @@
     saveData();
     renderExpensesView();
     window.scrollTo({ top: scrollY, behavior: 'instant' });
+  }
+
+  // --- Drag and Drop Row Reordering ---
+  function handleRowDragStart(e) {
+    if (e.target.closest('button, input, select, a, .badge, .tick-btn, .action-btns')) {
+      e.preventDefault();
+      return;
+    }
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    draggedItemId = tr.dataset.id;
+    draggedGroupTitle = tr.dataset.grouptitle || '';
+    tr.classList.add('is-dragging');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedItemId);
+    }
+  }
+
+  function handleRowDragOver(e) {
+    e.preventDefault();
+    const tr = e.target.closest('tr');
+    if (!tr || !draggedItemId || tr.dataset.id === draggedItemId) return;
+    if ((tr.dataset.grouptitle || '') !== draggedGroupTitle) return;
+
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    const rect = tr.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      tr.classList.remove('drop-below');
+      tr.classList.add('drop-above');
+    } else {
+      tr.classList.remove('drop-above');
+      tr.classList.add('drop-below');
+    }
+  }
+
+  function handleRowDragLeave(e) {
+    const tr = e.target.closest('tr');
+    if (tr) {
+      tr.classList.remove('drop-above', 'drop-below');
+    }
+  }
+
+  function handleRowDrop(e) {
+    e.preventDefault();
+    const targetTr = e.target.closest('tr');
+    if (!targetTr || !draggedItemId || targetTr.dataset.id === draggedItemId) return;
+    if ((targetTr.dataset.grouptitle || '') !== draggedGroupTitle) return;
+
+    const isBefore = targetTr.classList.contains('drop-above');
+    targetTr.classList.remove('drop-above', 'drop-below');
+
+    const sourceId = draggedItemId;
+    const targetId = targetTr.dataset.id;
+
+    const sourceIdx = appData.expenses.findIndex(e => e.id === sourceId);
+    if (sourceIdx === -1) return;
+    const [movedItem] = appData.expenses.splice(sourceIdx, 1);
+
+    const newTargetIdx = appData.expenses.findIndex(e => e.id === targetId);
+    if (newTargetIdx === -1) return;
+    const insertIdx = isBefore ? newTargetIdx : newTargetIdx + 1;
+    appData.expenses.splice(insertIdx, 0, movedItem);
+
+    const groupKey = movedItem.groupKey || getStandardGroupKey(movedItem.groupTitle || '', movedItem);
+    lastActiveGroupKey = groupKey;
+    expandedGroupCardIds.add('card-' + groupKey);
+
+    saveData();
+    const scrollY = window.scrollY;
+    renderExpensesView();
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+
+    showToast(`✅ Susunan '${movedItem.description}' berjaya dikemaskini!`, 'success');
+  }
+
+  function handleRowDragEnd(e) {
+    document.querySelectorAll('.draggable-row').forEach(row => {
+      row.classList.remove('is-dragging', 'drop-above', 'drop-below');
+    });
+    draggedItemId = null;
+    draggedGroupTitle = null;
+  }
+
+  function moveExpenseItem(expenseId, direction) {
+    const item = appData.expenses.find(e => e.id === expenseId);
+    if (!item) return;
+
+    const groupTitle = item.groupTitle || '✨ Lain-lain Persiapan';
+    const phase = item.phase;
+    
+    const groupItems = appData.expenses.filter(e => (e.groupTitle || '✨ Lain-lain Persiapan') === groupTitle && e.phase === phase);
+    const currIdxInGroup = groupItems.findIndex(e => e.id === expenseId);
+    if (currIdxInGroup === -1) return;
+
+    if (direction === 'up' && currIdxInGroup > 0) {
+      const neighbor = groupItems[currIdxInGroup - 1];
+      swapExpenseItems(item.id, neighbor.id);
+    } else if (direction === 'down' && currIdxInGroup < groupItems.length - 1) {
+      const neighbor = groupItems[currIdxInGroup + 1];
+      swapExpenseItems(item.id, neighbor.id);
+    } else {
+      return;
+    }
+
+    const groupKey = item.groupKey || getStandardGroupKey(item.groupTitle || '', item);
+    lastActiveGroupKey = groupKey;
+    expandedGroupCardIds.add('card-' + groupKey);
+
+    saveData();
+    const scrollY = window.scrollY;
+    renderExpensesView();
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+    showToast(`Turutan '${item.description}' dialih.`, 'info');
+  }
+
+  function swapExpenseItems(idA, idB) {
+    const idxA = appData.expenses.findIndex(e => e.id === idA);
+    const idxB = appData.expenses.findIndex(e => e.id === idB);
+    if (idxA !== -1 && idxB !== -1) {
+      const temp = appData.expenses[idxA];
+      appData.expenses[idxA] = appData.expenses[idxB];
+      appData.expenses[idxB] = temp;
+    }
   }
 
   // --- Receipt Storage & Modal Handling ---
@@ -2316,7 +2464,13 @@
     triggerUploadReceipt,
     openReceiptModal,
     deleteReceiptForExpense,
-    promptUploadGeneralReceipt
+    promptUploadGeneralReceipt,
+    handleRowDragStart,
+    handleRowDragOver,
+    handleRowDragLeave,
+    handleRowDrop,
+    handleRowDragEnd,
+    moveExpenseItem
   };
 
   document.addEventListener('DOMContentLoaded', init);
