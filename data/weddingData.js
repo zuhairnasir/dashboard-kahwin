@@ -20,18 +20,23 @@ const INITIAL_WEDDING_DATA = {
       "title": "Akad Nikah",
       "eventDate": "2027-03-27",
       "dateDisplay": "27 Mac 2027",
-      "theme": "Cream Gold",
+      "time": "5:00 Petang",
+      "timeDisplay": "5:00 Petang",
+      "theme": "Putih",
       "tag": "Majlis Pernikahan",
-      "venue": "Masjid / Dewan Nikah"
+      "venue": "Teluk Panglima Garang"
     },
     {
       "id": "bertandang",
       "title": "Bertandang (Belah Lelaki)",
       "eventDate": "2027-05-30",
       "dateDisplay": "30 Mei 2027",
-      "theme": "Baby Blue",
+      "time": "12:00 Tengah Hari",
+      "timeDisplay": "12:00 Tengah Hari",
+      "theme": "Champagne",
       "tag": "Resepsi Belah Lelaki",
-      "venue": "Dewan Majlis (800 pax)"
+      "venue": "Fatimah Grand Hall (500 pax)",
+      "pax": 500
     }
   ],
   "expenses": [
@@ -2266,7 +2271,7 @@ const INITIAL_WEDDING_DATA = {
       "phase": "bertandang",
       "phaseTitle": "Bertandang (Belah Lelaki)",
       "category": "d. Lokasi",
-      "description": "Sewaan Dewan (800pax)",
+      "description": "Sewaan Dewan - Fatimah Grand Hall (500 pax)",
       "budget": 22999,
       "actual": 22999,
       "status": "Belum",

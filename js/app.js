@@ -255,9 +255,29 @@
 
     if (data && Array.isArray(data.phases)) {
       data.phases = data.phases.filter(p => p.id !== 'sanding');
+      const nikahPhase = data.phases.find(p => p.id === 'nikah');
+      if (nikahPhase) {
+        nikahPhase.theme = 'Putih';
+        nikahPhase.venue = 'Teluk Panglima Garang';
+        nikahPhase.time = '5:00 Petang';
+        nikahPhase.timeDisplay = '5:00 Petang';
+      }
+      const bertandangPhase = data.phases.find(p => p.id === 'bertandang');
+      if (bertandangPhase) {
+        bertandangPhase.theme = 'Champagne';
+        bertandangPhase.venue = 'Fatimah Grand Hall (500 pax)';
+        bertandangPhase.time = '12:00 Tengah Hari';
+        bertandangPhase.timeDisplay = '12:00 Tengah Hari';
+        bertandangPhase.pax = 500;
+      }
     }
 
     if (data && Array.isArray(data.expenses)) {
+      data.expenses.forEach(item => {
+        if (item.phase === 'bertandang' && item.description && item.description.includes('800pax')) {
+          item.description = item.description.replace('800pax', '500 pax - Fatimah Grand Hall');
+        }
+      });
       data.expenses = deduplicateExpenses(data.expenses);
     }
 
@@ -746,9 +766,9 @@
     if (!stepsGrid) return;
 
     const milestones = [
-      { id: 'tunang', icon: '🌸', title: '1. Pertunangan', date: '5 Sept 2026', venue: 'Rumah Pengantin Perempuan' },
-      { id: 'nikah', icon: '💍', title: '2. Akad Nikah', date: '27 Mac 2027', venue: 'Masjid / Dewan Nikah' },
-      { id: 'bertandang', icon: '🏛️', title: '3. Bertandang Lelaki', date: '30 Mei 2027', venue: 'Dewan Majlis (800 Pax)' }
+      { id: 'tunang', icon: '🌸', title: '1. Pertunangan', date: '5 Sept 2026', venue: 'Kediaman Pengantin Perempuan', theme: 'Soft Pink' },
+      { id: 'nikah', icon: '💍', title: '2. Akad Nikah', date: '27 Mac 2027 (5:00 PTG)', venue: 'Teluk Panglima Garang', theme: 'Putih' },
+      { id: 'bertandang', icon: '🏛️', title: '3. Bertandang Lelaki', date: '30 Mei 2027 (12:00 TGH)', venue: 'Fatimah Grand Hall (500 pax)', theme: 'Champagne' }
     ];
 
     let stepsHtml = '';
@@ -767,7 +787,8 @@
              title="Klik untuk lihat butiran ${m.title}">
           <div class="milestone-step-icon">${m.icon}</div>
           <div class="milestone-step-name">${m.title}</div>
-          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">${m.date}</div>
+          <div style="font-size:0.72rem; color:var(--text-dark); font-weight:600; margin-top:2px;">${m.date}</div>
+          <div style="font-size:0.68rem; color:var(--text-muted); margin-top:1px;">📍 ${m.venue} • 🎨 ${m.theme}</div>
           
           <div style="height:4px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin:6px 0;">
             <div style="width:${progressPercent}%; height:100%; background:${isComplete ? 'var(--emerald)' : 'var(--primary)'}; transition: width 0.4s ease;"></div>
@@ -826,6 +847,16 @@
       if (elBalance) elBalance.textContent = formatRM(balance);
       if (elUnpaidLelaki) elUnpaidLelaki.textContent = formatRM(unpaidLelaki);
       if (elUnpaidPerempuan) elUnpaidPerempuan.textContent = formatRM(unpaidPerempuan);
+
+      const phaseObj = appData.phases ? appData.phases.find(p => p.id === pId) : null;
+      if (phaseObj) {
+        const elTheme = document.getElementById(`${pId}-banner-theme`);
+        const elVenue = document.getElementById(`${pId}-banner-venue`);
+        const elTime = document.getElementById(`${pId}-banner-time`);
+        if (elTheme && phaseObj.theme) elTheme.textContent = `🎨 Tema: ${phaseObj.theme}`;
+        if (elVenue && phaseObj.venue) elVenue.textContent = `📍 ${phaseObj.venue}`;
+        if (elTime && (phaseObj.timeDisplay || phaseObj.time)) elTime.textContent = `⏰ ${phaseObj.timeDisplay || phaseObj.time}`;
+      }
     });
   }
 
